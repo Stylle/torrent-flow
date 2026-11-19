@@ -876,6 +876,34 @@ input.search {
   }
 }
 
+/* Center a bounded work area within the space to the right of the sidebar. */
+.main {
+  width: calc(100% - 214px);
+  max-width: 2560px;
+  margin-left: calc(214px + max(0px, (100vw - 214px - 2560px) / 2));
+  margin-right: auto;
+}
+@media (min-width: 2560px) {
+  .main .chart {
+    height: 310px;
+  }
+  .stat strong {
+    font-size: 38px;
+  }
+}
+@media (max-width: 1200px) {
+  .main {
+    width: calc(100% - 190px);
+    margin-left: 190px;
+  }
+}
+@media (max-width: 1000px) {
+  .main {
+    width: 100%;
+    margin-left: 0;
+  }
+}
+
 /* Match the selected warm-white/teal dashboard while retaining real empty/error states. */
 :root:not([data-theme="dark"]) {
   --bg: #faf9f6;
@@ -931,5 +959,210 @@ input.search {
   }
   .stat:last-child {
     padding: 10px 14px;
+  }
+}
+
+/* Monitoring-oriented surfaces and accents, informed by Uptime Kuma. */
+:root:not([data-theme="dark"]) {
+  --bg: #f7f8fa;
+  --surface: #ffffff;
+  --ink: #20252d;
+  --muted: #707985;
+  --line: #e9edf1;
+  --teal: #5cdd8b;
+  --blue: #457cf2;
+  --soft: #e7faec;
+}
+:root[data-theme="dark"] {
+  --bg: #0d1117;
+  --surface: #161b22;
+  --ink: #d1d7e0;
+  --muted: #9ba5b1;
+  --line: #263141;
+  --teal: #5cdd8b;
+  --blue: #7da6ff;
+  --soft: #1d3629;
+}
+body {
+  font-size: 14px;
+}
+h1 {
+  font-size: 27px;
+  letter-spacing: -0.4px;
+}
+h2 {
+  font-size: 17px;
+  font-weight: 600;
+}
+.sidebar {
+  border-right-color: var(--line);
+}
+.brand {
+  font-size: 21px;
+}
+.brand > svg {
+  width: 28px;
+  height: 28px;
+}
+.brand small {
+  font-size: 10px;
+  letter-spacing: 0.15px;
+}
+.nav {
+  gap: 5px;
+}
+.nav button {
+  color: var(--ink);
+  border-radius: 10px;
+  font-weight: 400;
+}
+.nav button.active {
+  background: var(--soft);
+  color: var(--ink);
+  font-weight: 600;
+}
+.nav svg {
+  width: 16px;
+  height: 16px;
+  opacity: 0.8;
+}
+button {
+  border-radius: 9px;
+}
+.primary {
+  background: #5cdd8b;
+  color: #102b1a;
+  border-color: #5cdd8b;
+  border-radius: 22px;
+}
+.primary:hover {
+  background: #7ce8a4;
+}
+.group button.active {
+  background: #5cdd8b;
+  color: #102b1a;
+  border-radius: 7px;
+}
+.card {
+  border-color: transparent;
+  box-shadow: 0 3px 18px #18283506;
+}
+:root[data-theme="dark"] .card {
+  box-shadow: none;
+}
+.stats {
+  gap: 0;
+  background: var(--surface);
+  border-radius: 12px;
+  border: 1px solid var(--line);
+}
+.stat {
+  background: transparent;
+  border: none;
+  border-right: 1px solid var(--line);
+  border-radius: 0;
+  padding: 22px 25px;
+}
+.stat:last-child {
+  border-right: none;
+}
+.stat-icon,
+.stat.down .stat-icon {
+  padding: 0;
+  background: none;
+  border-radius: 0;
+  width: 27px;
+  justify-content: center;
+}
+.stat-icon {
+  color: #1d9c50;
+}
+.stat-label {
+  font-size: 13px;
+}
+.stat strong {
+  font-size: 32px;
+  font-weight: 600;
+}
+.client-symbol {
+  background: var(--bg);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  font-size: 14px;
+}
+.client-symbol.tr {
+  background: var(--bg);
+  color: var(--ink);
+}
+.badge {
+  border-radius: 18px;
+  padding: 4px 9px;
+  font-size: 11px;
+}
+:root:not([data-theme="dark"]) .badge {
+  color: #17753b;
+}
+:root:not([data-theme="dark"]) .up {
+  color: #178046;
+}
+:root:not([data-theme="dark"]) .badge.warn {
+  color: #9b6d18;
+}
+.notice {
+  background: var(--surface);
+  border-left: 3px solid #5cdd8b;
+  color: var(--muted);
+}
+.notice.demo {
+  border-left-color: #b99334;
+}
+th {
+  background: transparent;
+  font-size: 12px;
+}
+td {
+  border-bottom-color: var(--line);
+}
+.hint {
+  line-height: 1.7;
+}
+.modal {
+  box-shadow: 0 12px 60px #0002;
+}
+.section-head .icon {
+  border-color: transparent;
+  background: transparent;
+}
+@media (min-width: 2560px) {
+  .main .stat strong {
+    font-size: 38px;
+  }
+}
+@media (max-width: 600px) {
+  h1 {
+    font-size: 22px;
+  }
+  .stat {
+    padding: 18px 14px;
+  }
+  .stat:nth-child(2) {
+    border-right: none;
+  }
+  .stat strong {
+    font-size: 25px;
+  }
+  .stat:last-child {
+    padding: 12px 15px;
+    border-top: 1px solid var(--line);
+  }
+  .stat:last-child strong {
+    font-size: 21px;
+  }
+  .stat-icon {
+    width: 22px;
+  }
+  .card {
+    padding: 16px;
   }
 }

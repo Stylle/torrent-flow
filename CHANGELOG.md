@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.2
+
+- Fix creation of downloaders, sites and bandwidth pools on ordinary LAN HTTP origins by using a cryptographically secure UUID fallback.
+- Center the work area within the space beside the sidebar on 4K displays, with responsive width and chart sizing.
+- Refresh light/dark green-gray surfaces and solid icons using Uptime Kuma as the user's visual reference.
+
 ## 0.1.1
 
 - Default single-container deployment with embedded recovery; external guardian becomes optional.

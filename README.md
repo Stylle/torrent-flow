@@ -2,6 +2,10 @@
 
 面向个人 NAS 的 qBittorrent / Transmission 流量统计与上传带宽管理工具。浅色、深色、跟随系统，简体中文 / English，支持手机、平板和桌面。
 
+界面配色与图标风格参考 Uptime Kuma，保留流量统计自身布局；不使用其标识，与该项目无从属关系。
+
+支持通过普通局域网 HTTP 地址添加下载器、站点和带宽池；不依赖仅 HTTPS/localhost 可用的浏览器 UUID API。宽屏主区域在侧栏右侧空间内居中，保留适量两侧留白。
+
 ![界面预览（演示数据）](docs/screenshots/desktop.png)
 
 ## Docker 部署
@@ -90,7 +94,7 @@ go build -o torrent-flow .
 
 ## License / 致谢
 
-MIT。功能调研参考 [torrent-traffic-monitor](https://github.com/ystykxc/torrent-traffic-monitor)，本项目独立实现；下载器适配依据 [qBittorrent WebUI API](https://github.com/qbittorrent/qBittorrent/wiki/WebUI-API-%28qBittorrent-5.0%29)、[Transmission RPC](https://github.com/transmission/transmission/blob/main/docs/rpc-spec.md)。依赖的 React、Chart.js、Phosphor、Go x/crypto 与 modernc SQLite 保留各自上游授权。详见依赖清单及 lock 文件。
+MIT。功能调研参考 [torrent-traffic-monitor](https://github.com/ystykxc/torrent-traffic-monitor)，视觉参考 [Uptime Kuma](https://github.com/louislam/uptime-kuma)，本项目独立实现；下载器适配依据 [qBittorrent WebUI API](https://github.com/qbittorrent/qBittorrent/wiki/WebUI-API-%28qBittorrent-5.0%29)、[Transmission RPC](https://github.com/transmission/transmission/blob/main/docs/rpc-spec.md)。依赖的 React、Chart.js、Font Awesome、Go x/crypto 与 modernc SQLite 保留各自上游授权。详见依赖清单及 lock 文件。
 
 ---
 

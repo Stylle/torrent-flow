@@ -32,3 +32,11 @@ P3 follow-up: split the chart bundle if substantially slower devices show startu
 ## 0.1.1 follow-up
 
 Default deployment is now one container with embedded recovery; independent recovery is optional. The policy screen explains the whole-container downtime boundary in Chinese and English. Repeated desktop/tablet/phone route, overflow, theme/language and isolated integration checks passed. The subprocess fixture explicitly confirmed that recovery does not run while the entire single process is stopped, then confirmed restart reconciliation releases the limit. Historical-row preservation and a 1000-torrent/24-delta-poll storage test preserve byte totals while limiting new rows to one per torrent/site/hour/uncertainty class.
+
+## 0.1.2 follow-up: user-directed Kuma reference
+
+The user superseded the original palette/icon direction with Uptime Kuma. Inspected its official light/dark README screenshots and published theme variables. Kept Torrent Flow's own navigation and accounting layout; changed to neutral gray/white and dark slate surfaces, green accents, a unified metrics surface and Font Awesome solid icons. No mascot or third-party screenshot is redistributed as this application's own asset.
+
+Rendered and inspected light desktop/phone and dark phone/4K captures, including a side-by-side style comparison against the official reference. Tests at 3840×2160, 2560×1440, 1440×1024, 834×1194 and 390×844 found no document overflow. At 3840px, the 2560px main area has equal 533px margins within the workspace to the right of the 214px sidebar; charts are 310px tall.
+
+The original LAN HTTP bug was reproduced with `isSecureContext=false` and `crypto.randomUUID` unavailable: the add-downloader button failed before opening a form. The fixed build uses `getRandomValues` as a secure UUID fallback and successfully opened, tested and saved a downloader, site and pool through actual UI forms on an ordinary HTTP hostname. Test credentials and fixture data stayed outside Git. No changes were made to the user's NAS data.

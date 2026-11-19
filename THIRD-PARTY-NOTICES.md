@@ -4,7 +4,7 @@ Torrent Flow is MIT licensed. Runtime and build dependencies retain their upstre
 
 - React / React DOM — MIT, Meta Platforms, Inc. and affiliates.
 - Chart.js — MIT, Chart.js contributors.
-- Phosphor Icons React — MIT, Phosphor Icons contributors.
+- Font Awesome Free solid icons and React/core packages — upstream Fonticons notices apply (icons CC BY 4.0, fonts SIL OFL 1.1, code MIT as specified by their distributions). The project uses the SVG icon and React packages; license texts are included.
 - Go x/crypto and indirect x/sys — BSD-style Go project license.
 - modernc SQLite and related Go support modules — their respective BSD-style/public-domain upstream licenses, copied where provided.
 - Vite and its React build plugin are build-time dependencies, retaining upstream notices in their distributions.

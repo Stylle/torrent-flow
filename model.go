@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-const Version = "0.1.1"
+const Version = "0.1.2"
 
 type Client struct {
 	ID       string `json:"id"`

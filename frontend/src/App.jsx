@@ -24,12 +24,13 @@ import {
   FloppyDisk,
   Globe,
   ArrowRight,
-} from "@phosphor-icons/react";
+} from "./icons.jsx";
 import Chart from "chart.js/auto";
 import "./app.css";
+import { createID } from "./identity.js";
 const MB = 1048576,
   GB = 1073741824;
-const id = () => crypto.randomUUID();
+const id = createID;
 function bytes(v = 0, speed = false) {
   if (!v) return speed ? "0 B/s" : "0 B";
   const units = ["B", "KB", "MB", "GB", "TB"],
@@ -58,7 +59,7 @@ function demoData() {
       afterTarget: MB,
     }));
   return {
-    version: "0.1.0",
+    version: "0.1.2",
     config: {
       revision: 0,
       timezone: "Asia/Shanghai",
