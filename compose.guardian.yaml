@@ -1,0 +1,17 @@
+# Optional: docker compose -f compose.yaml -f compose.guardian.yaml up -d
+services:
+  torrent-flow:
+    environment:
+      EXTERNAL_GUARDIAN: 'true'
+  guardian:
+    image: stylle/torrent-flow:latest
+    container_name: torrent-flow-guardian
+    restart: unless-stopped
+    command: ["--guardian"]
+    volumes:
+      - ./data:/data
+    healthcheck:
+      test: ["CMD", "/app/flow", "--guardian-health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 20s

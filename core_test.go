@@ -76,6 +76,51 @@ func TestDomainAndRegex(t *testing.T) {
 	}
 }
 
+func TestOldHourlyRowsPreserved(t *testing.T) {
+	s := testStore(t)
+	now := time.Date(2026, 11, 19, 1, 10, 0, 0, time.UTC)
+	v := Torrent{Key: "fixture:abc", Site: "site", Uploaded: 100}
+	s.ingest("fixture", []Torrent{v}, now, 5)
+	s.db.Exec("INSERT INTO traffic(k,site,at,up,down,uncertain) VALUES(?,?,?,?,?,0)", v.Key, v.Site, now.Unix()-10, 15, 0)
+	s.db.Exec("INSERT INTO traffic(k,site,at,up,down,uncertain) VALUES(?,?,?,?,?,0)", v.Key, v.Site, now.Unix()-5, 20, 0)
+	v.Uploaded = 130
+	if e := s.ingest("fixture", []Torrent{v}, now.Add(5*time.Second), 5); e != nil {
+		t.Fatal(e)
+	}
+	var n, total int64
+	s.db.QueryRow("SELECT COUNT(*),SUM(up) FROM traffic").Scan(&n, &total)
+	if n != 2 || total != 65 {
+		t.Fatal("existing historical rows were removed or totals changed")
+	}
+}
+
+func TestHourlyRollupBoundsStorage(t *testing.T) {
+	s := testStore(t)
+	now := time.Date(2026, 11, 19, 1, 0, 0, 0, time.UTC)
+	items := make([]Torrent, 1000)
+	for i := range items {
+		items[i] = Torrent{Key: fmt.Sprintf("fixture:%040d", i), Site: "site"}
+	}
+	start := time.Now()
+	if e := s.ingest("fixture", items, now, 5); e != nil {
+		t.Fatal(e)
+	}
+	for step := 1; step <= 24; step++ {
+		for i := range items {
+			items[i].Uploaded += 1024
+		}
+		if e := s.ingest("fixture", items, now.Add(time.Duration(step)*5*time.Second), 5); e != nil {
+			t.Fatal(e)
+		}
+	}
+	var rows, total int64
+	s.db.QueryRow("SELECT COUNT(*),SUM(up) FROM traffic").Scan(&rows, &total)
+	if rows != 1000 || total != 24*1000*1024 {
+		t.Fatal("rollup changed accounting or did not bound rows")
+	}
+	t.Logf("1000 torrents, 24 delta polls: %d rows, %d bytes accounted, elapsed=%s", rows, total, time.Since(start))
+}
+
 func TestClientCounterNamespaceIsolation(t *testing.T) {
 	s := testStore(t)
 	now := time.Now()

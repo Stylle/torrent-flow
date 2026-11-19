@@ -18,6 +18,7 @@ type Engine struct {
 	suspended map[string]bool
 	adapters  map[string]*Adapter
 	started   bool
+	lastSpeed int64
 	warnings  []string
 }
 
@@ -104,7 +105,14 @@ func (e *Engine) tick(ctx context.Context) {
 		all = append(all, items...)
 		statuses = append(statuses, status)
 	}
-	e.s.db.Exec("INSERT OR REPLACE INTO speeds VALUES(?,?,?)", now.Unix(), up, down)
+	online := false
+	for _, status := range statuses {
+		online = online || status.Online
+	}
+	if online && now.Unix()-e.lastSpeed >= 15 {
+		e.s.db.Exec("INSERT OR REPLACE INTO speeds VALUES(?,?,?)", now.Unix(), up, down)
+		e.lastSpeed = now.Unix()
+	}
 	guard := heartbeat(e.s, "guardian")
 	if now.Unix()-guard > 20 {
 		e.restore(ctx, c)

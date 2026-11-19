@@ -334,7 +334,7 @@ func (sv *Server) save(w http.ResponseWriter, r *http.Request) {
 		control = control || p.Enabled
 	}
 	if control && time.Now().Unix()-heartbeat(sv.s, "guardian") > 20 {
-		failHTTP(w, 409, "independent guardian must be online before enabling control")
+		failHTTP(w, 409, "recovery protection must be online before enabling control")
 		return
 	} // Release using OLD credentials before changing endpoints, ownership or budgets.
 	if err = sv.e.restore(r.Context(), old); err != nil {

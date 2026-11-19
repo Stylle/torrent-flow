@@ -22,9 +22,11 @@ docker exec torrent-flow cat /data/initial-password.txt
 
 镜像会准备挂载目录后降权为 UID/GID 10001，普通可写 Docker 绑定目录或 named volume 即可。无需另外创建 data-init 服务。若显式指定 `user:` 或挂载为只读，需要自行授予该用户写入数据目录的权限。
 
-默认 Compose 有两个独立容器：Web/统计控制器与限速恢复守护。它们共享同一个数据目录；不需要 Redis、外部数据库或公网回调。仅需要统计时可只启动 `docker compose up -d torrent-flow`，没有守护时系统拒绝开启自动调速。
+默认只部署一个容器，内置恢复任务，不需要 Redis、外部数据库、额外初始化服务。进程异常后由 Docker 重启，启动时恢复系统限速。整个容器被停止、强杀或主机断电期间，内置任务无法运行；需要这段时间也能恢复时，才使用可选 `compose.guardian.yaml`：`docker compose -f compose.yaml -f compose.guardian.yaml up -d`。可选模式设置 EXTERNAL_GUARDIAN=true 并运行独立守护。
 
 不要把下载器的 WebUI 暴露到公网。访问地址必须从容器内部可达；Transmission 填完整 RPC 地址，如 `http://nas:9091/transmission/rpc`。测试按钮使用当前表单，密码留空则使用已有保存值，不要求先保存。
+
+从 0.1.0 双容器部署升级：先在后台关闭调速并恢复系统限速，替换为新版 `compose.yaml`，执行 `docker compose up -d --remove-orphans` 移除旧守护服务。保留原 `data/`；不要使用 `down -v`。只更新镜像而不替换旧 Compose，不会自动删除你原来定义的第二个容器。
 
 ## 使用顺序
 
@@ -41,18 +43,26 @@ docker exec torrent-flow cat /data/initial-password.txt
 ## 断线与恢复
 
 - 正常关闭、关闭调速、解除接管、无连接：只解除系统接管的种子限速，其他个人限速不变。
-- 控制器异常停止：独立 guardian 在心跳超过约 30 秒后读回并解除系统限速；恢复失败保留队列重试。
-- 网络中断、下载器或整台主机也关机、守护同时停止：无法远程修改下载器，待重新可达后继续恢复。`docker compose down` 同时关闭两个服务，不是独立守护仍在运行的测试。
+- 默认单容器：内置恢复任务检查心跳；整个进程退出时依赖 Docker 重启，启动时恢复限速。整个容器停止期间不能远程解除限速。
+- 可选独立 guardian：即使主容器停止，仍可在心跳超过约 30 秒后恢复限速；恢复失败保留队列重试。
+- 网络中断、下载器或整台主机也关机、守护同时停止：无法远程修改下载器，待重新可达后继续恢复。如可选模式下同时关闭两个服务，独立守护也无法继续恢复。
 - 用户在下载器手动改了被接管种子的限速：退出接管、记录外部修改，避免覆盖。
 - 页面“恢复系统限速”会关闭带宽池并解除系统限速，不是清空所有下载器限速。
 
-限速命令前持久化旧值与计划值，网络写入后读回验证；独立守护和控制器通过 SQLite 写事务串行化命令。轮询和客户端 API 都有延迟，因此预算是软件调度目标，不是网络层硬上限。
+限速命令前持久化旧值与计划值，网络写入后读回验证；恢复任务与控制器通过 SQLite 写事务串行化命令。轮询和客户端 API 都有延迟，因此预算是软件调度目标，不是网络层硬上限。
 
 ## 统计口径
 
 种子以“下载器实例 ID＋infohash”标识，累计计数器差分计量，不用速率乘时间。多个 Tracker 的种子只有一份统计；跨实例相同 hash 的两次传输分别计量。多个不同站点命中时显示冲突，等待指定主归属。
 
 删除种子不删除历史流量。计数器回退或重新添加建立新基线；不能还原客户端已经丢失的计数。长时间离线后能补记累计增量，但无法精确还原每个字节的时间，相关报表明确标注不确定区间。更改站点规则不重写既有历史，之后增量采用新的归属。
+
+## 占用与采集优化
+
+- 同一种子、站点、小时内的累计增量合并存储，上传/下载总量保持不变，不再每 5 秒新增一条永久记录。旧数据继续读取，不清空数据库。
+- 实时速度最多每 15 秒记录一次，保留 24 小时；未连接下载器时不写空速度记录。
+- 保留期清理最多每小时一次；Tracker 列表缓存两分钟。
+- 内存、CPU 和磁盘增长与下载器数量、种子数量、活跃种子比例有关，空载测试不代表大规模负载。
 
 ## 数据与安全
 
@@ -84,4 +94,4 @@ MIT。功能调研参考 [torrent-traffic-monitor](https://github.com/ystykxc/to
 
 ---
 
-**English:** Personal, self-hosted traffic accounting and upload-budget control for multiple qBittorrent / Transmission instances. Counters are measured per torrent, not per tracker; site aliases are grouped without duplicate accounting. Start the Compose stack, read the generated initial password locally, connect downloaders, configure site rules and optionally enable guarded bandwidth allocation. Only opted-in torrents are controlled. An independent guardian releases owned limits after the controller heartbeat expires; recovery cannot occur while the downloader or guardian is unreachable. Keep the entire data directory, including the encryption key, when migrating.
+**English:** Personal, self-hosted traffic accounting and upload-budget control for multiple qBittorrent / Transmission instances. Counters are measured per torrent, not per tracker; site aliases are grouped without duplicate accounting. Start the Compose stack, read the generated initial password locally, connect downloaders, configure site rules and optionally enable guarded bandwidth allocation. Only opted-in torrents are controlled. The default deployment uses one container with embedded recovery and restart reconciliation. An external guardian is optional for recovery while the controller container is stopped. No recovery can run while the responsible worker or downloader is unreachable. Keep the entire data directory, including the encryption key, when migrating.

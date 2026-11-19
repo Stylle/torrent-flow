@@ -28,3 +28,7 @@ Recaptured light desktop/tablet/phone, dark phone and English dark desktop, then
 - No browser runtime errors in these tests. Modal supports focus containment and Escape dismissal.
 
 P3 follow-up: split the chart bundle if substantially slower devices show startup delay; current production JavaScript is approximately 505 kB before compression. Generated charts and icon assets are implemented as Chart.js data plots and the Phosphor library rather than rasterized UI.
+
+## 0.1.1 follow-up
+
+Default deployment is now one container with embedded recovery; independent recovery is optional. The policy screen explains the whole-container downtime boundary in Chinese and English. Repeated desktop/tablet/phone route, overflow, theme/language and isolated integration checks passed. The subprocess fixture explicitly confirmed that recovery does not run while the entire single process is stopped, then confirmed restart reconciliation releases the limit. Historical-row preservation and a 1000-torrent/24-delta-poll storage test preserve byte totals while limiting new rows to one per torrent/site/hour/uncertainty class.

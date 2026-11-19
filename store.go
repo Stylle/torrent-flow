@@ -97,6 +97,7 @@ CREATE TABLE IF NOT EXISTS settings(k TEXT PRIMARY KEY,v BLOB NOT NULL);
 CREATE TABLE IF NOT EXISTS baseline(k TEXT PRIMARY KEY,up INTEGER,down INTEGER,at INTEGER,added INTEGER,present INTEGER DEFAULT 1);
 CREATE TABLE IF NOT EXISTS traffic(id INTEGER PRIMARY KEY,k TEXT,site TEXT,at INTEGER,up INTEGER,down INTEGER,uncertain INTEGER);
 CREATE INDEX IF NOT EXISTS traffic_at ON traffic(at);
+CREATE INDEX IF NOT EXISTS traffic_rollup ON traffic(k,site,at);
 CREATE TABLE IF NOT EXISTS speeds(at INTEGER PRIMARY KEY,up INTEGER,down INTEGER);
 CREATE TABLE IF NOT EXISTS leases(k TEXT PRIMARY KEY,client TEXT,hash TEXT,original INTEGER,last INTEGER,planned INTEGER,state TEXT,at INTEGER);
 CREATE TABLE IF NOT EXISTS control_blocks(k TEXT PRIMARY KEY,at INTEGER);
@@ -193,7 +194,15 @@ func (s *Store) ingest(client string, items []Torrent, now time.Time, poll int) 
 				u, d := t.Uploaded-p.up, t.Downloaded-p.down
 				if u > 0 || d > 0 {
 					uncertain := now.Unix()-p.at > int64(poll*3) || time.Unix(p.at, 0).In(now.Location()).Format("2006-01-02") != now.Format("2006-01-02")
-					_, e = tx.Exec("INSERT INTO traffic(k,site,at,up,down,uncertain) VALUES(?,?,?,?,?,?)", t.Key, t.Site, now.Unix(), u, d, uncertain)
+					hour := time.Date(now.Year(), now.Month(), now.Day(), now.Hour(), 0, 0, 0, now.Location())
+					result, updateErr := tx.Exec("UPDATE traffic SET up=up+?,down=down+? WHERE id=(SELECT id FROM traffic WHERE k=? AND site=? AND at>=? AND at<? AND uncertain=? ORDER BY id LIMIT 1)", u, d, t.Key, t.Site, hour.Unix(), hour.Add(time.Hour).Unix(), uncertain)
+					if updateErr != nil {
+						return updateErr
+					}
+					changed, _ := result.RowsAffected()
+					if changed == 0 {
+						_, e = tx.Exec("INSERT INTO traffic(k,site,at,up,down,uncertain) VALUES(?,?,?,?,?,?)", t.Key, t.Site, now.Unix(), u, d, uncertain)
+					}
 					if e != nil {
 						return e
 					}
@@ -207,10 +216,15 @@ func (s *Store) ingest(client string, items []Torrent, now time.Time, poll int) 
 			return e
 		}
 	}
-	tx.Exec("DELETE FROM traffic WHERE at<?", now.AddDate(-1, 0, 0).Unix())
-	tx.Exec("DELETE FROM speeds WHERE at<?", now.Add(-24*time.Hour).Unix())
-	tx.Exec("DELETE FROM sessions WHERE expires<?", now.Unix())
-	tx.Exec("DELETE FROM events WHERE at<?", now.AddDate(-1, 0, 0).Unix())
+	var maintenance int64
+	tx.QueryRow("SELECT CAST(v AS INTEGER) FROM settings WHERE k='maintenance'").Scan(&maintenance)
+	if now.Unix()-maintenance >= 3600 || now.Unix() < maintenance {
+		tx.Exec("DELETE FROM traffic WHERE at<?", now.AddDate(-1, 0, 0).Unix())
+		tx.Exec("DELETE FROM speeds WHERE at<?", now.Add(-24*time.Hour).Unix())
+		tx.Exec("DELETE FROM sessions WHERE expires<?", now.Unix())
+		tx.Exec("DELETE FROM events WHERE at<?", now.AddDate(-1, 0, 0).Unix())
+		tx.Exec("INSERT OR REPLACE INTO settings VALUES('maintenance',?)", now.Unix())
+	}
 	return tx.Commit()
 }
 func (s *Store) report(start, end time.Time) ([]Bucket, error) {

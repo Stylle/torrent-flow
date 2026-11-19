@@ -42,6 +42,10 @@ func main() {
 	if err = initAdmin(s, dir); err != nil {
 		log.Fatal(err)
 	}
+	if os.Getenv("EXTERNAL_GUARDIAN") != "true" {
+		go newEngine(s).guardian(ctx)
+		log.Print("Embedded recovery enabled; whole-container outages require restart or an optional external guardian")
+	}
 	sv := &Server{e: e, s: s, attempts: map[string][]time.Time{}}
 	addr := os.Getenv("LISTEN_ADDR")
 	if addr == "" {

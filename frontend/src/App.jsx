@@ -612,8 +612,8 @@ export function App() {
     <span className={"badge " + (!data?.guardian ? "warn" : "")}>
       <ShieldCheck size={15} />
       {data?.guardian
-        ? t("守护在线", "Guardian online")
-        : t("守护未连接", "Guardian offline")}
+        ? t("恢复保护在线", "Recovery online")
+        : t("恢复保护未连接", "Recovery offline")}
     </span>
   );
   const siteTable = (
@@ -1246,8 +1246,8 @@ export function App() {
             </div>
             <div className="notice">
               {t(
-                "不同出口使用不同带宽池。启用调速需要独立守护在线；最低额度不代表实际速度。",
-                "Use separate pools for different uplinks. Control requires an independent guardian; minimum allowances do not guarantee actual speed.",
+                "不同出口使用不同带宽池。默认内置恢复保护；整个容器停止期间不能解除限速，重启后恢复。外置守护为可选项，最低额度不代表实际速度。",
+                "Use separate uplink pools. Embedded recovery restores limits on restart, but cannot act while the whole container is stopped. An external guardian is optional. Allowances do not guarantee actual speed.",
               )}
             </div>
             {c.pools.map((p) => (
@@ -1617,8 +1617,8 @@ export function App() {
                     )}
                     {toggle(
                       "enabled",
-                      "启用自动分配（需要独立守护在线）",
-                      "Enable allocation (independent guardian required)",
+                      "启用自动分配（需要恢复保护在线）",
+                      "Enable allocation (recovery protection required)",
                     )}
                     <small>
                       {t(

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.1
+
+- Default single-container deployment with embedded recovery; external guardian becomes optional.
+- Explain whole-container outage recovery boundaries in the UI and deployment guide.
+- Compact new hourly torrent traffic deltas without changing totals or deleting historical data.
+- Sample speed history at most every 15 seconds and throttle expiry work to hourly.
+
+
 ## 0.1.0
 
 - Multi-instance qBittorrent / Transmission monitoring with cumulative counter deltas.
