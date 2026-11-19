@@ -33,7 +33,7 @@ func discoverSites(c Config, torrents []Torrent) (Config, int) {
 	sort.Strings(hosts)
 	added := 0
 	for _, h := range hosts {
-		if len(c.Sites) >= 256 {
+		if len(c.Sites) >= 255 {
 			break
 		}
 		// A broader host discovered in this same batch may already cover this alias.
@@ -41,7 +41,24 @@ func discoverSites(c Config, torrents []Torrent) (Config, int) {
 		if id != "" || ambiguous {
 			continue
 		}
-		c.Sites = append(c.Sites, Site{ID: randomID(), Name: h, Domains: []string{h}, Weight: 1, AfterTarget: 52429, Automatic: true})
+		c.Sites = append(c.Sites, Site{ID: randomID(), Name: h, Domains: []string{h}, Weight: 10, Minimum: 50000, AfterTarget: 52429, Automatic: true})
+		added++
+	}
+	needsFallback := false
+	hasFallback := false
+	for _, s := range c.Sites {
+		if s.ID == "tracker-unavailable" {
+			hasFallback = true
+		}
+	}
+	for _, t := range torrents {
+		id, amb := siteFor(t, c)
+		if id == "" && !amb {
+			needsFallback = true
+		}
+	}
+	if needsFallback && !hasFallback && len(c.Sites) < 256 {
+		c.Sites = append(c.Sites, Site{ID: "tracker-unavailable", Name: "Tracker 暂不可用", Weight: 10, Minimum: 50000, AfterTarget: 50000, Automatic: true})
 		added++
 	}
 	return c, added

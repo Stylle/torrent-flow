@@ -229,6 +229,7 @@ func (a *Adapter) list(ctx context.Context) ([]Torrent, error) {
 		if e = json.Unmarshal(b, &rows); e != nil {
 			return nil, fmt.Errorf("invalid qBittorrent torrent list")
 		}
+		trackerRequests := 0
 		for _, r := range rows {
 			t := Torrent{Client: a.c.ID, Hash: strings.ToLower(r.Hash), Name: r.Name, Uploaded: r.Uploaded, Downloaded: r.Downloaded, Up: r.Up, Down: r.Down, Limit: r.Limit, Connections: r.Connections, Added: r.Added}
 			if t.Limit < 0 {
@@ -242,14 +243,45 @@ func (a *Adapter) list(ctx context.Context) ([]Torrent, error) {
 				a.trackerCache = map[string]trackerEntry{}
 			}
 			cached, ok := a.trackerCache[t.Hash]
-			if ok && time.Since(cached.at) < 2*time.Minute {
-				t.Trackers = cached.urls
+			primaryAvailable := host(r.Tracker) != ""
+			primaryMatches := !primaryAvailable
+			for _, raw := range cached.urls {
+				if raw == r.Tracker {
+					primaryMatches = true
+				}
+			}
+			if ok && primaryMatches && time.Since(cached.at) < 30*time.Minute {
+				if primaryAvailable {
+					t.Trackers = append([]string{r.Tracker}, cached.urls...)
+				} else {
+					t.Trackers = cached.urls
+				}
 				out = append(out, t)
 				continue
 			}
+			if trackerRequests >= 32 {
+				if ok && primaryMatches {
+					t.Trackers = append(t.Trackers, cached.urls...)
+				}
+				if host(r.Tracker) != "" {
+					t.Trackers = append([]string{r.Tracker}, t.Trackers...)
+				}
+				out = append(out, t)
+				continue
+			}
+			trackerRequests++
 			tb, e := a.qb(ctx, "torrents/trackers?hash="+url.QueryEscape(t.Hash), nil)
 			if e != nil {
-				return nil, e
+				if host(r.Tracker) != "" {
+					t.Trackers = []string{r.Tracker}
+				} else if ok {
+					t.Trackers = cached.urls
+				}
+				out = append(out, t)
+				continue
+			}
+			if host(r.Tracker) != "" {
+				t.Trackers = append(t.Trackers, r.Tracker)
 			}
 			var trackers []struct {
 				URL string `json:"url"`

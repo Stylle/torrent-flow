@@ -49,7 +49,7 @@ func TestDiscoveryGroupsHostsWithoutSecretsAndPreservesNames(t *testing.T) {
 	}
 }
 
-func TestAutomaticControlRequiresOptInAndRespectsExclusions(t *testing.T) {
+func TestAutomaticControlUsesMasterSwitch(t *testing.T) {
 	s := testStore(t)
 	cl, m := mockClient(t)
 	cl.Pool = "pool"
@@ -61,8 +61,8 @@ func TestAutomaticControlRequiresOptInAndRespectsExclusions(t *testing.T) {
 	e := newEngine(s)
 	e.tick(context.Background())
 	c, _ = s.config()
-	if len(c.Sites) == 0 || len(e.torrents) != 1 || e.torrents[0].Site == "" || m.limit != 0 {
-		t.Fatal("discovery failed or enabled control without consent")
+	if len(c.Sites) == 0 || len(e.torrents) != 1 || e.torrents[0].Site == "" || m.limit == 0 {
+		t.Fatal("discovery or automatic strategy failed")
 	}
 	revision := c.Revision
 	c.Clients[0].AutoManage = true
@@ -75,10 +75,11 @@ func TestAutomaticControlRequiresOptInAndRespectsExclusions(t *testing.T) {
 	if current.Revision != revision {
 		t.Fatal("discovery rewrites configuration every tick")
 	}
-	c.Overrides[e.torrents[0].Key] = Override{Manage: false}
+	off := false
+	c.PolicyEnabled = &off
 	s.saveConfig(c)
 	e.tick(context.Background())
 	if m.limit != 0 || e.torrents[0].Managed {
-		t.Fatal("explicit per-torrent exclusion did not restore limit")
+		t.Fatal("master switch did not restore limit")
 	}
 }

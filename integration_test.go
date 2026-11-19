@@ -54,7 +54,7 @@ func TestEngineIdleAndExternalSuspension(t *testing.T) {
 	s.db.Exec("INSERT OR REPLACE INTO settings VALUES('guardian',?)", time.Now().Unix())
 	e := newEngine(s)
 	e.tick(context.Background())
-	if m.limit != 20000 || len(e.torrents) != 1 || !e.torrents[0].Managed {
+	if m.limit != 50000 || len(e.torrents) != 1 || !e.torrents[0].Managed {
 		t.Fatal("active torrent not allocated")
 	}
 	m.connections = 0
@@ -188,7 +188,7 @@ func TestHTTPAuthCSRFAndSettings(t *testing.T) {
 	}
 }
 
-func TestInfeasibleSiteCapReleasesInsteadOfRaisingCap(t *testing.T) {
+func TestFixedMinimumTakesPrecedenceWithWarning(t *testing.T) {
 	s := testStore(t)
 	cl, m := mockClient(t)
 	cl.Pool = "pool"
@@ -201,8 +201,8 @@ func TestInfeasibleSiteCapReleasesInsteadOfRaisingCap(t *testing.T) {
 	s.db.Exec("INSERT OR REPLACE INTO settings VALUES('guardian',?)", time.Now().Unix())
 	e := newEngine(s)
 	e.tick(context.Background())
-	if m.limit != 0 || len(e.warnings) == 0 {
-		t.Fatal("infeasible cap silently exceeded")
+	if m.limit != 50000 || len(e.warnings) == 0 {
+		t.Fatal("fixed minimum not preserved or warning missing")
 	}
 }
 

@@ -222,12 +222,13 @@ func TestCalendarAndEncryptedConfig(t *testing.T) {
 }
 
 type qbMock struct {
-	mu          sync.Mutex
-	limit       int64
-	reject      bool
-	connections int
-	uploaded    int64
-	writes      int
+	forceTraffic bool
+	mu           sync.Mutex
+	limit        int64
+	reject       bool
+	connections  int
+	uploaded     int64
+	writes       int
 }
 
 func (m *qbMock) serve(w http.ResponseWriter, r *http.Request) {
@@ -245,7 +246,12 @@ func (m *qbMock) serve(w http.ResponseWriter, r *http.Request) {
 		fmt.Sscan(r.Form.Get("limit"), &m.limit)
 		m.writes++
 	case "/api/v2/torrents/info":
-		json.NewEncoder(w).Encode([]map[string]any{{"hash": "abc", "name": "Fixture torrent", "uploaded": m.uploaded, "downloaded": 20, "upspeed": 3000, "num_leechs": m.connections, "up_limit": m.limit, "added_on": 1}})
+		json.NewEncoder(w).Encode([]map[string]any{{"hash": "abc", "name": "Fixture torrent", "uploaded": m.uploaded, "downloaded": 20, "upspeed": func() int {
+			if m.connections > 0 || m.forceTraffic {
+				return 3000
+			}
+			return 0
+		}(), "num_leechs": m.connections, "up_limit": m.limit, "added_on": 1}})
 	case "/api/v2/torrents/trackers":
 		json.NewEncoder(w).Encode([]map[string]any{{"url": "https://a.example/fixture"}, {"url": "https://b.example/fixture"}})
 	default:

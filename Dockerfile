@@ -11,6 +11,7 @@ WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 COPY *.go ./
+COPY internal/ ./internal/
 COPY --from=frontend /src/frontend/dist/client ./frontend/dist/client
 ARG TARGETOS=linux
 ARG TARGETARCH=amd64
@@ -22,7 +23,7 @@ COPY --from=build /flow /app/flow
 COPY docker-entrypoint.sh /app/entrypoint.sh
 COPY LICENSE README.md THIRD-PARTY-NOTICES.md /app/docs/
 COPY licenses/ /app/docs/licenses/
-LABEL org.opencontainers.image.title="Torrent Flow" org.opencontainers.image.version="0.1.4" org.opencontainers.image.licenses="MIT" org.opencontainers.image.source="https://github.com/Stylle/torrent-flow" org.opencontainers.image.documentation="https://github.com/Stylle/torrent-flow#readme" org.opencontainers.image.description="qBittorrent and Transmission traffic accounting with guarded per-torrent upload allocation"
+LABEL org.opencontainers.image.title="Torrent Flow" org.opencontainers.image.version="0.1.5" org.opencontainers.image.licenses="MIT" org.opencontainers.image.source="https://github.com/Stylle/torrent-flow" org.opencontainers.image.documentation="https://github.com/Stylle/torrent-flow#readme" org.opencontainers.image.description="qBittorrent and Transmission traffic accounting with guarded per-torrent upload allocation"
 RUN chmod 755 /app/entrypoint.sh
 ENV DATA_DIR=/data LISTEN_ADDR=:8080 EXTERNAL_GUARDIAN=true
 VOLUME ["/data"]

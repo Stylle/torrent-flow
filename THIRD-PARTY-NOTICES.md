@@ -10,3 +10,5 @@ Torrent Flow is MIT licensed. Runtime and build dependencies retain their upstre
 - Vite and its React build plugin are build-time dependencies, retaining upstream notices in their distributions.
 
 The repository used for feature research is credited in README.md; no source files or interface screenshots from that project are redistributed as this implementation's own code or assets.
+
+Portable archive validation/snapshot code under internal/portablebackup is reused from [Stylle/today-random-movie-web](https://github.com/Stylle/today-random-movie-web) (MIT). Webhook JSON template escaping is adapted from [Stylle/wusaqi-gallery-go](https://github.com/Stylle/wusaqi-gallery-go) (MIT). Their author and MIT notices remain covered by LICENSE; the original projects retain their own notices.

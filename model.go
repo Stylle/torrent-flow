@@ -10,18 +10,20 @@ import (
 	"time"
 )
 
-const Version = "0.1.4"
+const Version = "0.1.5"
 
 type Client struct {
-	AutoManage bool   `json:"autoManage,omitempty"`
-	ID         string `json:"id"`
-	Name       string `json:"name"`
-	Kind       string `json:"kind"`
-	URL        string `json:"url"`
-	User       string `json:"user"`
-	Password   string `json:"password,omitempty"`
-	Pool       string `json:"pool"`
-	Enabled    bool   `json:"enabled"`
+	StrategyEnabled *bool  `json:"strategyEnabled"`
+	ClearPending    bool   `json:"clearPending"`
+	AutoManage      bool   `json:"autoManage,omitempty"`
+	ID              string `json:"id"`
+	Name            string `json:"name"`
+	Kind            string `json:"kind"`
+	URL             string `json:"url"`
+	User            string `json:"user"`
+	Password        string `json:"password,omitempty"`
+	Pool            string `json:"pool"`
+	Enabled         bool   `json:"enabled"`
 }
 type Site struct {
 	Automatic   bool     `json:"automatic,omitempty"`
@@ -48,15 +50,22 @@ type Override struct {
 	Manage bool   `json:"manage"`
 }
 type Config struct {
-	Revision    int64               `json:"revision"`
-	Clients     []Client            `json:"clients"`
-	Sites       []Site              `json:"sites"`
-	Pools       []Pool              `json:"pools"`
-	Overrides   map[string]Override `json:"overrides"`
-	Timezone    string              `json:"timezone"`
-	PollSeconds int                 `json:"pollSeconds"`
-	IdleSeconds int                 `json:"idleSeconds"`
+	Notify        NotifyConfig        `json:"notify"`
+	ClearPending  bool                `json:"clearPending"`
+	PolicyEnabled *bool               `json:"policyEnabled"`
+	PolicyVersion int                 `json:"policyVersion"`
+	Revision      int64               `json:"revision"`
+	Clients       []Client            `json:"clients"`
+	Sites         []Site              `json:"sites"`
+	Pools         []Pool              `json:"pools"`
+	Overrides     map[string]Override `json:"overrides"`
+	Timezone      string              `json:"timezone"`
+	PollSeconds   int                 `json:"pollSeconds"`
+	IdleSeconds   int                 `json:"idleSeconds"`
 }
+
+func clientPolicyOn(cl Client) bool { return cl.StrategyEnabled == nil || *cl.StrategyEnabled }
+func policyOn(c Config) bool        { return c.PolicyEnabled == nil || *c.PolicyEnabled }
 
 func defaultConfig() Config {
 	return Config{Clients: []Client{}, Sites: []Site{}, Pools: []Pool{}, Overrides: map[string]Override{}, Timezone: "Asia/Shanghai", PollSeconds: 5, IdleSeconds: 15}
@@ -189,6 +198,9 @@ func (c Config) manages(t Torrent) bool {
 }
 
 func (c Config) validate() error {
+	if err := c.Notify.validate(); err != nil {
+		return err
+	}
 	if len(c.Clients) > 32 || len(c.Sites) > 256 || len(c.Pools) > 32 || len(c.Overrides) > 50000 {
 		return fmt.Errorf("configuration exceeds supported limits")
 	}
@@ -225,7 +237,7 @@ func (c Config) validate() error {
 	var floors int64
 	sites := map[string]bool{}
 	for _, s := range c.Sites {
-		if !check(s.ID) || s.Name == "" || s.Weight < 1 || s.Weight > 1000 || s.Minimum < 0 || s.Maximum < 0 || s.DayTarget < 0 || s.MonthTarget < 0 || s.AfterTarget < 0 || s.Maximum > 1<<40 || s.Minimum > 1<<40 || (s.Maximum > 0 && s.Minimum > s.Maximum) {
+		if !check(s.ID) || s.Name == "" || s.Weight < 1 || s.Weight > 10 || s.Minimum < 0 || s.Maximum < 0 || s.DayTarget < 0 || s.MonthTarget < 0 || s.AfterTarget < 0 || s.Maximum > 1<<40 || s.Minimum > 1<<40 {
 			return fmt.Errorf("invalid site bandwidth")
 		}
 		if (s.DayTarget > 0 || s.MonthTarget > 0) && s.AfterTarget < 1024 {
@@ -247,11 +259,7 @@ func (c Config) validate() error {
 		floors += s.Minimum
 		sites[s.ID] = true
 	}
-	for _, p := range c.Pools {
-		if floors > p.Budget {
-			return fmt.Errorf("site minimum allowances exceed pool budget")
-		}
-	}
+	_ = floors
 	for _, o := range c.Overrides {
 		if o.Site != "" && !sites[o.Site] {
 			return fmt.Errorf("unknown site override")

@@ -16,6 +16,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -26,6 +27,7 @@ import (
 var assets embed.FS
 
 type Server struct {
+	notifyMu sync.Mutex
 	e        *Engine
 	s        *Store
 	mu       sync.Mutex
@@ -144,6 +146,12 @@ func (sv *Server) handler() http.Handler {
 	api.HandleFunc("POST /api/release", sv.release)
 	api.HandleFunc("POST /api/password", sv.password)
 	api.HandleFunc("POST /api/match", sv.match)
+	api.HandleFunc("POST /api/policy", sv.policy)
+	api.HandleFunc("POST /api/client-policy", sv.clientPolicy)
+	api.HandleFunc("GET /api/backup", sv.backup)
+	api.HandleFunc("POST /api/backup", sv.backup)
+	api.HandleFunc("POST /api/test-webhook", sv.testWebhook)
+	api.HandleFunc("GET /api/notification-jobs", sv.notificationJobs)
 	mux.Handle("/api/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, csrf := sv.session(r)
 		if csrf == "" {
@@ -220,6 +228,8 @@ func (sv *Server) login(w http.ResponseWriter, r *http.Request) {
 	jsonOut(w, map[string]string{"csrf": csrf})
 }
 func redacted(c Config) Config {
+	c.Notify.HeadersStored = c.Notify.Headers != ""
+	c.Notify.Headers = ""
 	for i := range c.Clients {
 		c.Clients[i].Password = ""
 	}
@@ -244,13 +254,14 @@ func (sv *Server) snapshot(w http.ResponseWriter, r *http.Request) {
 			failHTTP(w, 400, "invalid date")
 			return
 		}
-		if v.Before(now.AddDate(-1, 0, -1)) || v.After(now.AddDate(0, 0, 1)) {
-			failHTTP(w, 400, "date outside retention window")
-			return
-		}
 		now = v
 	}
 	start, end := period(now, r.URL.Query().Get("period"))
+	actualNow := time.Now().In(loc)
+	if !end.After(actualNow.AddDate(-1, 0, -1)) || start.After(actualNow.AddDate(0, 0, 1)) {
+		failHTTP(w, 400, "date outside retention window")
+		return
+	}
 	buckets, err := sv.s.report(start, end)
 	if err != nil {
 		failHTTP(w, 500, "statistics unavailable")
@@ -287,7 +298,44 @@ func (sv *Server) snapshot(w http.ResponseWriter, r *http.Request) {
 		}
 		rows.Close()
 	}
-	jsonOut(w, map[string]any{"version": Version, "config": redacted(c), "clients": statuses, "torrents": torrents, "warnings": warnings, "buckets": buckets, "speeds": speeds, "leases": leases, "events": events, "guardian": time.Now().Unix()-heartbeat(sv.s, "guardian") < 20, "start": start.Unix(), "end": end.Unix()})
+	siteRates := map[string]int64{}
+	for _, t := range torrents {
+		siteRates[t.Site] += t.Up
+	}
+	payload := map[string]any{"version": Version, "config": redacted(c), "clients": statuses, "warnings": warnings, "buckets": buckets, "speeds": speeds, "leases": leases, "events": events, "guardian": time.Now().Unix()-heartbeat(sv.s, "guardian") < 20, "start": start.Unix(), "end": end.Unix(), "siteRates": siteRates}
+	if view := r.URL.Query().Get("view"); view != "" {
+		needle := strings.ToLower(r.URL.Query().Get("search"))
+		if len(needle) > 256 {
+			needle = needle[:256]
+		}
+		filtered := []Torrent{}
+		for _, t := range torrents {
+			if view == "none" {
+				break
+			}
+			if view == "active" && t.Connections <= 0 && t.Up <= 0 {
+				continue
+			}
+			if needle != "" && !strings.Contains(strings.ToLower(t.Name), needle) && !strings.Contains(strings.ToLower(strings.Join(t.Hosts, " ")), needle) {
+				continue
+			}
+			filtered = append(filtered, t)
+		}
+		offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+		if offset < 0 {
+			offset = 0
+		}
+		offset = offset / 50 * 50
+		if offset >= len(filtered) {
+			offset = max(0, (len(filtered)-1)/50*50)
+		}
+		stop := min(len(filtered), offset+50)
+		payload["torrentTotal"] = len(filtered)
+		payload["torrentOffset"] = offset
+		torrents = filtered[offset:stop]
+	}
+	payload["torrents"] = torrents
+	jsonOut(w, payload)
 }
 func (sv *Server) save(w http.ResponseWriter, r *http.Request) {
 	var c Config
@@ -301,14 +349,27 @@ func (sv *Server) save(w http.ResponseWriter, r *http.Request) {
 	if c.Sites == nil {
 		c.Sites = []Site{}
 	}
-	if c.Pools == nil {
-		c.Pools = []Pool{}
+	if len(c.Pools) == 0 {
+		c.Pools = []Pool{{ID: "default-outlet", Name: "默认出口 · 50 Mbps", Budget: 6250000, Enabled: true}}
+	}
+	for i := range c.Pools {
+		c.Pools[i].Enabled = true
+	}
+	for i := range c.Clients {
+		c.Clients[i].Enabled = true
+		if c.Clients[i].Pool == "" {
+			c.Clients[i].Pool = c.Pools[0].ID
+		}
 	}
 	if c.Overrides == nil {
 		c.Overrides = map[string]Override{}
 	}
 	sv.e.mu.Lock()
 	defer sv.e.mu.Unlock()
+	if !sv.stillAuthorized(r) {
+		failHTTP(w, 401, "sign in required")
+		return
+	}
 	old, err := sv.s.config()
 	if err != nil {
 		failHTTP(w, 500, "configuration unavailable")
@@ -318,6 +379,24 @@ func (sv *Server) save(w http.ResponseWriter, r *http.Request) {
 		failHTTP(w, 409, "settings changed; reload before saving")
 		return
 	}
+	c.PolicyEnabled = old.PolicyEnabled
+	c.ClearPending = old.ClearPending
+	c.PolicyVersion = old.PolicyVersion
+	for _, previous := range old.Clients {
+		found := false
+		for i := range c.Clients {
+			if c.Clients[i].ID == previous.ID {
+				found = true
+				c.Clients[i].ClearPending = previous.ClearPending
+				c.Clients[i].StrategyEnabled = previous.StrategyEnabled
+			}
+		}
+		if previous.ClearPending && !found {
+			failHTTP(w, 409, "请先完成该下载器的限速清空 / Pending downloader clearance must complete before removal")
+			return
+		}
+	}
+
 	for i := range c.Clients {
 		c.Clients[i] = normalizeClient(c.Clients[i])
 		for _, o := range old.Clients {
@@ -326,18 +405,27 @@ func (sv *Server) save(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+	if c.Notify.Headers == "" {
+		c.Notify.Headers = old.Notify.Headers
+	}
 	if err = c.validate(); err != nil {
 		failHTTP(w, 400, err.Error())
 		return
 	}
-	var control bool
-	for _, p := range c.Pools {
-		control = control || p.Enabled
-	}
-	if control && time.Now().Unix()-heartbeat(sv.s, "guardian") > 20 {
-		failHTTP(w, 409, "recovery protection must be online before enabling control")
+	comparison := c
+	comparison.Notify = old.Notify
+	comparison.Revision = old.Revision
+	before, _ := json.Marshal(old)
+	after, _ := json.Marshal(comparison)
+	if string(before) == string(after) {
+		c.Revision++
+		if sv.s.saveConfig(c) != nil {
+			failHTTP(w, 500, "cannot save notification settings")
+			return
+		}
+		jsonOut(w, redacted(c))
 		return
-	} // Release using OLD credentials before changing endpoints, ownership or budgets.
+	}
 	if err = sv.e.restore(r.Context(), old); err != nil {
 		// A changed password/address must be repairable without discarding the ownership journal.
 		// Verify the administrator-selected replacement can read every outstanding owned hash first.
@@ -443,23 +531,38 @@ func (sv *Server) testClient(w http.ResponseWriter, r *http.Request) {
 func (sv *Server) release(w http.ResponseWriter, r *http.Request) {
 	sv.e.mu.Lock()
 	defer sv.e.mu.Unlock()
+	if !sv.stillAuthorized(r) {
+		failHTTP(w, 401, "sign in required")
+		return
+	}
 	c, err := sv.s.config()
 	if err != nil {
 		failHTTP(w, 500, "configuration unavailable")
 		return
 	}
-	for i := range c.Pools {
-		c.Pools[i].Enabled = false
+	enabled := false
+	c.PolicyEnabled = &enabled
+	for i := range c.Clients {
+		c.Clients[i].StrategyEnabled = &enabled
+		c.Clients[i].ClearPending = false
 	}
+	c.ClearPending = true
 	c.Revision++
-	if err = sv.s.saveConfig(c); err != nil {
-		failHTTP(w, 500, "cannot disable controller")
+	if sv.s.saveConfig(c) != nil {
+		failHTTP(w, 500, "cannot persist stopped strategy")
 		return
 	}
-	if err = sv.e.restore(r.Context(), c); err != nil {
-		failHTTP(w, 502, "some limits could not be restored; recovery list retained")
+	if err = sv.e.clearAll(r.Context(), c); err != nil {
+		failHTTP(w, 502, err.Error())
 		return
 	}
+	c.ClearPending = false
+	c.Revision++
+	if sv.s.saveConfig(c) != nil {
+		failHTTP(w, 500, "cannot persist completed stop")
+		return
+	}
+	sv.s.db.Exec("INSERT INTO events(at,kind,k,message) VALUES(?,?,?,?)", time.Now().Unix(), "strategy-stop", "", "策略已停止，种子级限速已清空 / Strategy stopped; torrent upload limits cleared")
 	jsonOut(w, map[string]bool{"ok": true})
 }
 func (sv *Server) password(w http.ResponseWriter, r *http.Request) {
@@ -503,4 +606,139 @@ func (sv *Server) match(w http.ResponseWriter, r *http.Request) {
 	c, _ := sv.s.config()
 	id, ambiguous := siteFor(Torrent{Trackers: []string{v.URL}}, c)
 	jsonOut(w, map[string]any{"host": host(v.URL), "site": id, "ambiguous": ambiguous})
+}
+
+func (sv *Server) policy(w http.ResponseWriter, r *http.Request) {
+	var v struct {
+		Enabled bool `json:"enabled"`
+	}
+	if decode(w, r, &v) != nil {
+		failHTTP(w, 400, "invalid policy switch")
+		return
+	}
+	if !v.Enabled {
+		sv.release(w, r)
+		return
+	}
+	sv.e.mu.Lock()
+	defer sv.e.mu.Unlock()
+	if !sv.stillAuthorized(r) {
+		failHTTP(w, 401, "sign in required")
+		return
+	}
+	c, err := sv.s.config()
+	if err != nil {
+		failHTTP(w, 500, "configuration unavailable")
+		return
+	}
+	if c.ClearPending {
+		failHTTP(w, 409, "请等待清空限速完成 / Wait for pending limit clearance")
+		return
+	}
+	if time.Now().Unix()-heartbeat(sv.s, "guardian") > 20 {
+		failHTTP(w, 409, "恢复守护未连接 / Recovery guardian offline")
+		return
+	}
+	c.PolicyEnabled = &v.Enabled
+	for i := range c.Pools {
+		c.Pools[i].Enabled = true
+	}
+	c.Revision++
+	if sv.s.saveConfig(c) != nil {
+		failHTTP(w, 500, "cannot persist strategy")
+		return
+	}
+	sv.s.db.Exec("INSERT INTO events(at,kind,k,message) VALUES(?,?,?,?)", time.Now().Unix(), "strategy-start", "", "自动分配策略已启动 / Automatic allocation started")
+	jsonOut(w, redacted(c))
+}
+
+func (sv *Server) clientPolicy(w http.ResponseWriter, r *http.Request) {
+	var v struct {
+		ID      string `json:"id"`
+		Enabled bool   `json:"enabled"`
+	}
+	if decode(w, r, &v) != nil {
+		failHTTP(w, 400, "invalid switch")
+		return
+	}
+	sv.e.mu.Lock()
+	defer sv.e.mu.Unlock()
+	if !sv.stillAuthorized(r) {
+		failHTTP(w, 401, "sign in required")
+		return
+	}
+	c, err := sv.s.config()
+	if err != nil {
+		failHTTP(w, 500, "configuration unavailable")
+		return
+	}
+	index := -1
+	for i, cl := range c.Clients {
+		if cl.ID == v.ID {
+			index = i
+		}
+	}
+	if index < 0 {
+		failHTTP(w, 404, "downloader not found")
+		return
+	}
+	if v.Enabled && (c.Clients[index].ClearPending || c.ClearPending) {
+		failHTTP(w, 409, "请等待限速清空完成 / Clearance pending")
+		return
+	}
+	if v.Enabled && time.Now().Unix()-heartbeat(sv.s, "guardian") > 20 {
+		failHTTP(w, 409, "恢复守护未连接 / Guardian offline")
+		return
+	}
+	if v.Enabled {
+		cl := c.Clients[index]
+		sv.s.db.Exec("DELETE FROM control_blocks WHERE k>=? AND k<?", cl.ID+":", cl.ID+";")
+		for key := range sv.e.suspended {
+			if strings.HasPrefix(key, cl.ID+":") {
+				delete(sv.e.suspended, key)
+			}
+		}
+		for i := range c.Pools {
+			if c.Pools[i].ID == cl.Pool {
+				c.Pools[i].Enabled = true
+			}
+		}
+	}
+	c.Clients[index].StrategyEnabled = &v.Enabled
+	c.Clients[index].ClearPending = !v.Enabled
+	if v.Enabled {
+		on := true
+		c.PolicyEnabled = &on
+	}
+	c.Revision++
+	if sv.s.saveConfig(c) != nil {
+		failHTTP(w, 500, "cannot save switch")
+		return
+	}
+	if !v.Enabled {
+		one := c
+		one.Clients = []Client{c.Clients[index]}
+		if err = sv.e.clearAll(r.Context(), one); err != nil {
+			failHTTP(w, 502, err.Error())
+			return
+		}
+		c.Clients[index].ClearPending = false
+		c.Revision++
+		if sv.s.saveConfig(c) != nil {
+			failHTTP(w, 500, "cannot finish clearance")
+			return
+		}
+	}
+	sv.s.db.Exec("INSERT INTO events(at,kind,k,message)VALUES(?,?,?,?)", time.Now().Unix(), "downloader-strategy", v.ID, fmt.Sprintf("下载器自动策略 / Downloader strategy: %t", v.Enabled))
+	jsonOut(w, redacted(c))
+}
+
+// Production routes require a cookie in middleware; internal fixture calls may omit it.
+// Recheck after waiting for the configuration lock so a restore cannot revive revoked work.
+func (sv *Server) stillAuthorized(r *http.Request) bool {
+	if _, err := r.Cookie("flow_session"); err != nil {
+		return true
+	}
+	_, csrf := sv.session(r)
+	return csrf != ""
 }

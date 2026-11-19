@@ -33,12 +33,13 @@ const MB = 1048576,
 const id = createID;
 function bytes(v = 0, speed = false) {
   if (!v) return speed ? "0 B/s" : "0 B";
+  const scale = speed ? 1000 : 1024;
   const units = ["B", "KB", "MB", "GB", "TB"],
     i = Math.max(
       0,
-      Math.min(4, Math.floor(Math.log(Math.abs(v)) / Math.log(1024))),
+      Math.min(4, Math.floor(Math.log(Math.abs(v)) / Math.log(scale))),
     );
-  return `${(v / 1024 ** i).toLocaleString(undefined, { maximumFractionDigits: i < 2 ? 0 : 2 })} ${units[i]}${speed ? "/s" : ""}`;
+  return `${(v / scale ** i).toLocaleString(undefined, { maximumFractionDigits: i < 2 ? 0 : 2 })} ${units[i]}${speed ? "/s" : ""}`;
 }
 function demoData() {
   const now = Date.now() / 1000,
@@ -59,7 +60,7 @@ function demoData() {
       afterTarget: MB,
     }));
   return {
-    version: "0.1.4",
+    version: "0.1.5",
     config: {
       revision: 0,
       timezone: "Asia/Shanghai",
@@ -109,7 +110,8 @@ function demoData() {
     ],
     torrents: ["City.Walk.2026", "Ocean.Documentary", "Mountain.Light"].map(
       (name, i) => ({
-        key: "qb:" + i,
+        key: (i === 1 ? "tr:" : "qb:") + i,
+        client: i === 1 ? "tr" : "qb",
         name,
         hosts: [
           ["tracker.north.example"],
@@ -215,12 +217,28 @@ function Plot({ data, bars, dark, labels }) {
     </div>
   );
 }
+function isoWeekValue(day) {
+  const d = new Date(day + "T00:00:00Z");
+  d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+  const year = d.getUTCFullYear();
+  const week = Math.ceil(
+    ((d - new Date(Date.UTC(year, 0, 1))) / 86400000 + 1) / 7,
+  );
+  return `${year}-W${String(week).padStart(2, "0")}`;
+}
+function weekStart(value) {
+  const [year, week] = value.split("-W").map(Number);
+  const d = new Date(Date.UTC(year, 0, 4));
+  d.setUTCDate(d.getUTCDate() - (d.getUTCDay() || 7) + 1 + (week - 1) * 7);
+  return d.toISOString().slice(0, 10);
+}
 export function App() {
   const demo = new URLSearchParams(location.search).get("demo") === "1";
   const [data, setData] = useState(demo ? demoData() : null),
     [auth, setAuth] = useState(demo ? "yes" : "loading"),
     [csrf, setCsrf] = useState(""),
     [page, setPage] = useState(0),
+    [torrentPage, setTorrentPage] = useState(0),
     [menu, setMenu] = useState(false),
     [period, setPeriod] = useState("day"),
     [date, setDate] = useState(new Date().toLocaleDateString("en-CA")),
@@ -234,9 +252,28 @@ export function App() {
     [modal, setModal] = useState(null),
     [form, setForm] = useState({}),
     [busy, setBusy] = useState(false),
-    [search, setSearch] = useState("");
+    [search, setSearch] = useState(""),
+    [backupFile, setBackupFile] = useState(null),
+    [notificationJobs, setNotificationJobs] = useState([]);
+  const backupInput = useRef(null);
+  const restoreInFlight = useRef(false);
   const t = (zh, en) => (lang === "zh" ? zh : en),
     c = data?.config;
+  useEffect(() => {
+    if (page !== 5 || auth !== "yes" || demo) return;
+    let active = true;
+    api("notification-jobs")
+      .then((v) => {
+        if (active) setNotificationJobs(v);
+      })
+      .catch((e) => {
+        if (active) setError(e.message);
+      });
+    return () => {
+      active = false;
+    };
+  }, [page, auth, data?.version]);
+  useEffect(() => setTorrentPage(0), [page, search]);
   useEffect(() => {
     localStorage.setItem("flow.lang", lang);
     document.documentElement.lang = lang === "zh" ? "zh-CN" : "en";
@@ -330,7 +367,7 @@ export function App() {
     });
     const v = await r.json();
     if (!r.ok) {
-      if (r.status === 401) setAuth("no");
+      if (r.status === 401 && !restoreInFlight.current) setAuth("no");
       throw Error(v.error || `HTTP ${r.status}`);
     }
     return v;
@@ -346,22 +383,31 @@ export function App() {
   }, []);
   async function refresh() {
     if (!demo) {
-      const v = await api(`snapshot?period=${period}&date=${date}`);
+      const v = await api(
+        `snapshot?period=${page === 1 ? period : "day"}&date=${page === 1 ? date : new Date().toLocaleDateString("en-CA")}&view=${page === 0 ? "active" : page === 1 || page === 2 ? "all" : "none"}&offset=${torrentPage * 50}&search=${encodeURIComponent(page === 1 ? search : "")}`,
+      );
       setData(v);
     }
   }
   useEffect(() => {
     if (auth !== "yes" || demo) return;
-    let alive = true;
+    let alive = true,
+      inFlight = false;
     const update = async () => {
+      if (inFlight || document.hidden) return;
+      inFlight = true;
       try {
-        const v = await api(`snapshot?period=${period}&date=${date}`);
+        const v = await api(
+          `snapshot?period=${page === 1 ? period : "day"}&date=${page === 1 ? date : new Date().toLocaleDateString("en-CA")}&view=${page === 0 ? "active" : page === 1 || page === 2 ? "all" : "none"}&offset=${torrentPage * 50}&search=${encodeURIComponent(page === 1 ? search : "")}`,
+        );
         if (alive) {
           setData(v);
           setError("");
         }
       } catch (e) {
         if (alive) setError(e.message);
+      } finally {
+        inFlight = false;
       }
     };
     update();
@@ -370,7 +416,7 @@ export function App() {
       alive = false;
       clearInterval(timer);
     };
-  }, [auth, period, date]);
+  }, [auth, period, date, page, torrentPage, search]);
   const totals = useMemo(() => {
     const v = { up: 0, down: 0, sites: {}, uncertain: false };
     for (const b of data?.buckets || []) {
@@ -396,15 +442,26 @@ export function App() {
       .filter((x) => x.online)
       .reduce((s, x) => s + x.up, 0),
     siteName = (k) =>
-      c?.sites.find((s) => s.id === k)?.name || t("未分类", "Unclassified"),
+      c?.sites.find((s) => s.id === k)?.name ||
+      t("历史归属", "Historical attribution"),
     names = [
       t("流量总览", "Overview"),
       t("站点统计", "Sites"),
-      t("带宽策略", "Bandwidth"),
+      t("带宽出口", "Bandwidth outlets"),
       t("下载器", "Downloaders"),
       t("设置", "Settings"),
+      t("回调通知", "Webhook"),
+      t("备份恢复", "Backup & restore"),
     ],
-    nav = [House, ChartBar, Stack, DownloadSimple, GearSix];
+    nav = [
+      House,
+      ChartBar,
+      Stack,
+      DownloadSimple,
+      GearSix,
+      Broadcast,
+      FloppyDisk,
+    ];
   function open(kind, v = {}) {
     setModal(kind);
     setError("");
@@ -414,7 +471,7 @@ export function App() {
     open("site", {
       ...s,
       domainText: s.domains.join("\n"),
-      minimum: Number((s.minimum / MB).toFixed(3)),
+      minimum: (s.minimum || 50000) / 1000,
       maximum: Number((s.maximum / MB).toFixed(3)),
       afterTarget: Number((s.afterTarget / MB).toFixed(3)),
       dayTarget: Number((s.dayTarget / GB).toFixed(3)),
@@ -427,8 +484,8 @@ export function App() {
       name: "",
       domains: [],
       regex: "",
-      weight: 1,
-      minimum: 0,
+      weight: 10,
+      minimum: 50000,
       maximum: 0,
       dayTarget: 0,
       monthTarget: 0,
@@ -443,7 +500,10 @@ export function App() {
       url: "",
       user: "",
       password: "",
-      pool: c.pools.length === 1 ? c.pools[0].id : "",
+      pool:
+        c.pools.find((p) => p.id === "default-outlet")?.id ||
+        c.pools[0]?.id ||
+        "",
       autoManage: false,
       enabled: true,
     });
@@ -509,6 +569,8 @@ export function App() {
         weight: Number(form.weight || 1),
         manage: !!form.manage,
       };
+    else if (modal === "notify")
+      next.notify = { ...form, headersStored: undefined };
     else if (modal === "preferences") {
       next.timezone = form.timezone;
       next.pollSeconds = Number(form.pollSeconds);
@@ -520,13 +582,14 @@ export function App() {
         v.domains = v.domainText.split(/[\n,\s]+/).filter(Boolean);
         delete v.domainText;
         for (const k of ["minimum", "maximum", "afterTarget"])
-          v[k] = Math.round(Number(v[k] || 0) * MB);
+          v[k] = Math.round(Number(v[k] || 0) * (k === "minimum" ? 1000 : MB));
         for (const k of ["dayTarget", "monthTarget"])
           v[k] = Math.round(Number(v[k] || 0) * GB);
         v.weight = Number(v.weight);
       }
       if (modal === "pool") {
-        v.budget = Math.round(Number(v.budget) * MB);
+        v.enabled = true;
+        v.budget = Math.round((Number(v.budget) * 1000000) / 8);
         if (!next.pools.length)
           next.clients = next.clients.map((cl) =>
             cl.pool ? cl : { ...cl, pool: v.id },
@@ -558,22 +621,47 @@ export function App() {
       for (const cl of next.clients) if (cl.pool === form.id) cl.pool = "";
     await saveConfig(next);
   }
-  async function release() {
+  async function testWebhook() {
+    setBusy(true);
+    try {
+      if (!demo) await api("test-webhook", form);
+      setToast(
+        t("测试通知已发送，配置未保存", "Test sent; settings were not saved"),
+      );
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function restoreBackup() {
+    if (!backupFile) return;
     if (
       !confirm(
         t(
-          "关闭自动调速，并恢复本系统接管的种子不限速？",
-          "Disable control and release all system-managed limits?",
+          "恢复将覆盖当前数据，服务端会保留恢复前备份。请先停止所有下载器策略并等待限速清空；恢复后重新登录，自动策略保持暂停。继续？",
+          "Restore replaces current data and preserves a rollback backup. Stop downloader strategies and wait for limit clearance first. Sign in again after restore; strategies remain paused. Continue?",
         ),
       )
     )
       return;
+    restoreInFlight.current = true;
     setBusy(true);
     try {
-      if (!demo) await api("release", {});
-      setToast(t("已恢复系统接管限速", "System limits released"));
-      await refresh();
+      const r = await fetch("/api/backup", {
+        method: "POST",
+        headers: {
+          "X-CSRF-Token": csrf,
+          "X-Confirm-Restore": "replace",
+          "Content-Type": "application/zip",
+        },
+        body: backupFile,
+      });
+      const v = await r.json();
+      if (!r.ok) throw Error(v.error || "Restore failed");
+      location.replace("/");
     } catch (e) {
+      restoreInFlight.current = false;
       setError(e.message);
     } finally {
       setBusy(false);
@@ -678,7 +766,7 @@ export function App() {
               ? [
                   {
                     id: "",
-                    name: t("未分类", "Unclassified"),
+                    name: t("历史归属", "Historical attribution"),
                     weight: "—",
                     domains: [],
                   },
@@ -699,9 +787,10 @@ export function App() {
               <td>{bytes(totals.sites[s.id]?.down)}</td>
               <td className="hide-phone">
                 {bytes(
-                  data.torrents
-                    .filter((x) => x.site === s.id)
-                    .reduce((a, x) => a + x.up, 0),
+                  data.siteRates?.[s.id] ??
+                    data.torrents
+                      .filter((x) => x.site === s.id)
+                      .reduce((a, x) => a + x.up, 0),
                   true,
                 )}
               </td>
@@ -717,7 +806,7 @@ export function App() {
           <Globe size={30} />
           {t(
             "连接下载器后自动发现 Tracker，点击站点修改名称",
-            "Tracker sites appear automatically after connecting a downloader. Click a site to rename it.",
+            "Trackers appear automatically; rename sites as needed.",
           )}
           <br />
           <button onClick={newSite}>
@@ -740,6 +829,12 @@ export function App() {
             <div className="grow">
               <h3>{cl.name}</h3>
               <small>
+                {t("带宽出口：", "Outlet: ")}
+                {c.pools.find((p) => p.id === cl.pool)?.name ||
+                  t("默认出口", "Default outlet")}{" "}
+                · {bytes(c.pools.find((p) => p.id === cl.pool)?.budget, true)}
+              </small>
+              <small>
                 <span className={"dot " + (!s?.online ? "offline" : "")} />
                 {s?.online
                   ? t("运行中", "Online")
@@ -748,11 +843,66 @@ export function App() {
                     : t("未启用", "Disabled")}
               </small>
               {page === 3 && s?.error && <small>{s.error}</small>}
+              {cl.clearPending && (
+                <small role="status">
+                  {t(
+                    "限速清空待重试，完成后才能重新启动策略",
+                    "Limit clearance pending; wait before restarting allocation",
+                  )}
+                </small>
+              )}
             </div>
             <div className="speeds">
               <span className="up">↑ {bytes(s?.up, true)}</span>
               <span className="down">↓ {bytes(s?.down, true)}</span>
             </div>
+            <button
+              disabled={busy || cl.clearPending}
+              className={
+                cl.strategyEnabled === false || c.policyEnabled === false
+                  ? ""
+                  : "primary"
+              }
+              onClick={async () => {
+                const enabled =
+                  cl.strategyEnabled === false || c.policyEnabled === false;
+                if (
+                  !enabled &&
+                  !confirm(
+                    t(
+                      "停止该下载器自动策略并清空其种子级上传限速？",
+                      "Stop this downloader strategy and clear its torrent upload limits?",
+                    ),
+                  )
+                )
+                  return;
+                setBusy(true);
+                try {
+                  if (!demo) await api("client-policy", { id: cl.id, enabled });
+                  else
+                    setData((d) => ({
+                      ...d,
+                      config: {
+                        ...d.config,
+                        clients: d.config.clients.map((x) =>
+                          x.id === cl.id
+                            ? { ...x, strategyEnabled: enabled }
+                            : x,
+                        ),
+                      },
+                    }));
+                  await refresh();
+                } catch (e) {
+                  setError(e.message);
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              {cl.strategyEnabled === false || c.policyEnabled === false
+                ? t("启动自动策略", "Start strategy")
+                : t("停止自动策略", "Stop strategy")}
+            </button>
             {page === 3 && (
               <button
                 className="icon"
@@ -785,16 +935,21 @@ export function App() {
       monitoring: t("监控中", "Monitoring"),
       "release pending": t("恢复待重试", "Recovery pending"),
     })[v] || v;
+  const serverPaged = data?.torrentTotal !== undefined;
   const visibleTorrents = (data?.torrents || []).filter(
     (x) =>
-      (page !== 1 ||
+      (serverPaged ||
+        page !== 1 ||
         !search ||
         x.name.toLowerCase().includes(search.toLowerCase()) ||
         (x.hosts || []).some((h) =>
           h.toLowerCase().includes(search.toLowerCase()),
         )) &&
-      (page !== 0 || (x.managed && x.connections > 0)),
+      (page !== 0 || x.connections > 0 || x.up > 0),
   );
+  const torrentCount = data?.torrentTotal ?? visibleTorrents.length;
+  const lastTorrentPage = Math.max(0, Math.ceil(torrentCount / 50) - 1);
+  const currentTorrentPage = Math.min(torrentPage, lastTorrentPage);
   const torrents = (
     <div className="table-wrap">
       <table>
@@ -808,7 +963,13 @@ export function App() {
           </tr>
         </thead>
         <tbody>
-          {visibleTorrents.map((x) => (
+          {(serverPaged
+            ? visibleTorrents
+            : visibleTorrents.slice(
+                currentTorrentPage * 50,
+                (currentTorrentPage + 1) * 50,
+              )
+          ).map((x) => (
             <tr
               key={x.key}
               className="action-row"
@@ -826,6 +987,12 @@ export function App() {
             >
               <td className="name">
                 <span className="torrent-name">{x.name}</span>
+                <small>
+                  {t("下载器：", "Downloader: ")}
+                  {c.clients.find((cl) => cl.id === x.client)?.name ||
+                    x.client ||
+                    "—"}
+                </small>
                 <small
                   className="tracker-hosts"
                   title={(x.hosts || []).join(" · ")}
@@ -858,6 +1025,25 @@ export function App() {
           ))}
         </tbody>
       </table>
+      {torrentCount > 50 && (
+        <div className="toolbar">
+          <button
+            disabled={currentTorrentPage === 0}
+            onClick={() => setTorrentPage(currentTorrentPage - 1)}
+          >
+            {t("上一页", "Previous")}
+          </button>
+          <span>
+            {currentTorrentPage + 1} / {lastTorrentPage + 1} · {torrentCount}
+          </span>
+          <button
+            disabled={currentTorrentPage === lastTorrentPage}
+            onClick={() => setTorrentPage(currentTorrentPage + 1)}
+          >
+            {t("下一页", "Next")}
+          </button>
+        </div>
+      )}
       {!visibleTorrents.length && (
         <div className="empty">
           {t(
@@ -1038,18 +1224,6 @@ export function App() {
           <div className="page-title">
             <h1>{names[page]}</h1>
           </div>
-          <div className="header-filters">
-            {page < 2 && periods}
-            {page < 2 && (
-              <input
-                className="date"
-                type="date"
-                aria-label={t("统计日期", "Report date")}
-                value={date}
-                onChange={(e) => e.target.value && setDate(e.target.value)}
-              />
-            )}
-          </div>
           <div className="controls">
             {controls}
             <button
@@ -1077,6 +1251,14 @@ export function App() {
             {error}
           </div>
         )}
+        {c.clearPending && (
+          <div className="notice" role="status">
+            {t(
+              "策略已停止，部分下载器的限速清空尚未完成，系统会重试。",
+              "Strategy stopped. Some limit clearance tasks are pending and will retry.",
+            )}
+          </div>
+        )}
         {data.warnings?.map((v) => (
           <div className="notice" key={v}>
             {v}
@@ -1089,14 +1271,213 @@ export function App() {
                 "toolbar filters " + (page === 0 ? "overview-filters" : "")
               }
             >
-              {periods}
-              <input
-                className="date"
-                type="date"
-                aria-label={t("统计日期", "Report date")}
-                value={date}
-                onChange={(e) => e.target.value && setDate(e.target.value)}
-              />
+              {page === 1 && periods}
+              {page === 1 && period === "week" && (
+                <div className="period-selector">
+                  <select
+                    aria-label={t("周所属年份", "Week year")}
+                    value={isoWeekValue(date).slice(0, 4)}
+                    onChange={(e) =>
+                      setDate(
+                        weekStart(
+                          e.target.value +
+                            "-W" +
+                            String(
+                              Math.min(
+                                Number(isoWeekValue(date).slice(6)),
+                                Number(
+                                  isoWeekValue(e.target.value + "-12-28").slice(
+                                    6,
+                                  ),
+                                ),
+                              ),
+                            ).padStart(2, "0"),
+                        ),
+                      )
+                    }
+                  >
+                    {[
+                      ...new Set([
+                        new Date().getFullYear(),
+                        new Date().getFullYear() - 1,
+                        Number(isoWeekValue(date).slice(0, 4)),
+                      ]),
+                    ]
+                      .sort((a, b) => b - a)
+                      .map((y) => (
+                        <option key={y} value={y}>
+                          {y}
+                        </option>
+                      ))}
+                  </select>
+                  <select
+                    aria-label={t("选择统计周", "Choose report week")}
+                    value={Number(isoWeekValue(date).slice(6))}
+                    onChange={(e) =>
+                      setDate(
+                        weekStart(
+                          isoWeekValue(date).slice(0, 4) +
+                            "-W" +
+                            String(e.target.value).padStart(2, "0"),
+                        ),
+                      )
+                    }
+                  >
+                    {Array.from(
+                      {
+                        length: Number(
+                          isoWeekValue(
+                            isoWeekValue(date).slice(0, 4) + "-12-28",
+                          ).slice(6),
+                        ),
+                      },
+                      (_, i) => {
+                        const n = i + 1,
+                          start = weekStart(
+                            isoWeekValue(date).slice(0, 4) +
+                              "-W" +
+                              String(n).padStart(2, "0"),
+                          ),
+                          end = new Date(
+                            Date.parse(start + "T00:00:00Z") + 6 * 86400000,
+                          )
+                            .toISOString()
+                            .slice(0, 10);
+                        return (
+                          <option
+                            key={n}
+                            value={n}
+                            disabled={
+                              Date.parse(start + "T00:00:00Z") >
+                              Date.now() + 86400000
+                            }
+                          >
+                            {t("第", "Week ")}
+                            {n}
+                            {t("周 · ", " · ")}
+                            {start.slice(5)} — {end.slice(5)}
+                          </option>
+                        );
+                      },
+                    )}
+                  </select>
+                </div>
+              )}
+              {page === 1 && period === "month" && (
+                <div className="period-selector">
+                  <select
+                    aria-label={t("月份所属年份", "Month year")}
+                    value={date.slice(0, 4)}
+                    onChange={(e) =>
+                      setDate(e.target.value + date.slice(4, 7) + "-01")
+                    }
+                  >
+                    {[
+                      new Date().getFullYear(),
+                      new Date().getFullYear() - 1,
+                    ].map((y) => (
+                      <option key={y} value={y}>
+                        {y}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    aria-label={t("选择统计月份", "Choose report month")}
+                    value={Number(date.slice(5, 7))}
+                    onChange={(e) =>
+                      setDate(
+                        date.slice(0, 4) +
+                          "-" +
+                          String(e.target.value).padStart(2, "0") +
+                          "-01",
+                      )
+                    }
+                  >
+                    {Array.from({ length: 12 }, (_, i) => (
+                      <option
+                        key={i}
+                        value={i + 1}
+                        disabled={
+                          Number(date.slice(0, 4)) ===
+                            new Date().getFullYear() &&
+                          i > new Date().getMonth()
+                        }
+                      >
+                        {i + 1}
+                        {t("月", "")}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              {page === 1 && period === "year" && (
+                <select
+                  aria-label={t("选择统计年份", "Choose report year")}
+                  value={date.slice(0, 4)}
+                  onChange={(e) => setDate(e.target.value + "-01-01")}
+                >
+                  {[new Date().getFullYear(), new Date().getFullYear() - 1].map(
+                    (y) => (
+                      <option key={y} value={y}>
+                        {y}
+                      </option>
+                    ),
+                  )}
+                </select>
+              )}
+              {page === 1 && period === "day" && (
+                <input
+                  className="date"
+                  type={
+                    period === "year"
+                      ? "number"
+                      : period === "month"
+                        ? "month"
+                        : period === "week"
+                          ? "week"
+                          : "date"
+                  }
+                  aria-label={t("选择统计周期", "Choose report period")}
+                  value={
+                    period === "year"
+                      ? date.slice(0, 4)
+                      : period === "month"
+                        ? date.slice(0, 7)
+                        : period === "week"
+                          ? isoWeekValue(date)
+                          : date
+                  }
+                  min={
+                    period === "year" ? new Date().getFullYear() - 1 : undefined
+                  }
+                  max={period === "year" ? new Date().getFullYear() : undefined}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (!v) return;
+                    const d =
+                      period === "year"
+                        ? v.length === 4
+                          ? v + "-01-01"
+                          : ""
+                        : period === "month"
+                          ? v + "-01"
+                          : period === "week"
+                            ? weekStart(v)
+                            : v;
+                    if (d) setDate(d);
+                  }}
+                />
+              )}
+              {page === 1 && (
+                <small>
+                  {new Date(data.start * 1000).toLocaleDateString()} —{" "}
+                  {new Date((data.end - 1) * 1000).toLocaleDateString()} ·{" "}
+                  {t(
+                    "最多保留一年，较早日期可能不完整",
+                    "One-year retention; earlier periods may be partial",
+                  )}
+                </small>
+              )}
               <span className="grow" />
               {page === 1 && (
                 <>
@@ -1187,50 +1568,18 @@ export function App() {
                 </div>
               )}
             </section>
-            <div className="split">
-              <section className="card">
-                <div className="section-head">
-                  <h2>{t("下载器", "Downloaders")}</h2>
-                  <button
-                    className="icon"
-                    aria-label={t("管理下载器", "Manage downloaders")}
-                    onClick={() => setPage(3)}
-                  >
-                    <Plus />
-                  </button>
-                </div>
-                {clients}
-              </section>
-              <section className="card">
-                <div className="section-head">
-                  <h2>{t("站点流量统计", "Traffic by site")}</h2>
-                  <button
-                    className="icon"
-                    aria-label={t("管理站点", "Manage sites")}
-                    onClick={() => setPage(1)}
-                  >
-                    <ArrowRight />
-                  </button>
-                </div>
-                {siteTable}
-              </section>
-            </div>
             <section className="card">
               <div className="section-head">
                 <div>
                   <h2>{t("动态带宽分配", "Dynamic bandwidth")}</h2>
                   {guard}
                 </div>
-                <button onClick={release} disabled={busy}>
-                  <ArrowClockwise />
-                  {t("恢复系统限速", "Release system limits")}
-                </button>
               </div>
               {torrents}
               <p className="hint">
                 <Info size={15} />
                 {t(
-                  "仅显示正在接管且有上传连接的种子。完整列表在站点统计和带宽策略中查看。",
+                  "显示有上传连接或正在上传的种子，包括待分配和操作失败项；由总开关管理自动策略。",
                   "Only controlled torrents with upload connections appear here. Find all torrents in Sites or Bandwidth policies.",
                 )}
               </p>
@@ -1288,23 +1637,19 @@ export function App() {
             <div className="toolbar">
               {guard}
               <span className="grow" />
-              <button onClick={release} disabled={busy}>
-                <ArrowClockwise />
-                {t("恢复系统限速", "Release system limits")}
-              </button>
               <button
                 className="primary"
                 onClick={() =>
                   open("pool", {
                     id: id(),
                     name: t("主出口", "Main uplink"),
-                    budget: 1,
-                    enabled: false,
+                    budget: 50,
+                    enabled: true,
                   })
                 }
               >
                 <Plus />
-                {t("添加带宽池", "Add bandwidth pool")}
+                {t("添加出口", "Add outlet")}
               </button>
             </div>
             <div className="notice">
@@ -1326,7 +1671,7 @@ export function App() {
                   </div>
                   <button
                     onClick={() =>
-                      open("pool", { ...p, budget: p.budget / MB })
+                      open("pool", { ...p, budget: (p.budget * 8) / 1000000 })
                     }
                   >
                     <GearSix />
@@ -1444,6 +1789,159 @@ export function App() {
             </p>
           </>
         )}
+        {page === 5 && (
+          <>
+            <section className="card">
+              <div className="section-head">
+                <h2>{t("Webhook 推送通道", "Webhook channel")}</h2>
+                <button
+                  className="primary"
+                  onClick={() =>
+                    open("notify", {
+                      method: "POST",
+                      bodyType: "json",
+                      bodyTemplate:
+                        '{"title":"{{title}}","content":"{{content}}"}',
+                      reportTime: "08:00",
+                      ...c.notify,
+                      headers: "",
+                    })
+                  }
+                >
+                  {t("配置通知", "Configure notifications")}
+                </button>
+              </div>
+              <p>
+                {c.notify?.enabled
+                  ? t("已启用", "Enabled")
+                  : t("未启用", "Disabled")}
+              </p>
+              <p className="hint">
+                {t(
+                  "沿用图床的 URL、方法、JSON 请求头和 JSON/Text 模板；支持 title、content、text、event、time、fields。请求头留空保留，测试使用当前草稿。",
+                  "Uses Gallery-style URL, method, JSON headers and JSON/Text templates. Variables: title, content, text, event, time, fields. Blank headers preserve saved values. Tests use the draft.",
+                )}
+              </p>
+            </section>
+            <section className="card">
+              <h2>{t("报告与告警", "Reports & alerts")}</h2>
+              <p>
+                {t(
+                  "按系统时区发送：日报报告前一天，周报在周一报告上一周，月报在每月1日报告上个月。告警包括出口最低额度超预算、下载器离线和清空限速待重试。相同告警最多每15分钟一次。",
+                  "Uses the configured timezone. Daily reports cover yesterday; Monday reports cover last week; first-of-month reports cover last month. Alerts cover minimums above budget, offline downloaders and pending clearance, with a 15-minute cooldown.",
+                )}
+              </p>
+              <p className="hint">
+                {t(
+                  "失败最多尝试4次，间隔1/5/15分钟，任务和结果持久保存；响应丢失时外部服务可能收到重复通知。",
+                  "Up to four attempts with 1/5/15-minute backoff, persisted across restart. A lost response can cause duplicate delivery.",
+                )}
+              </p>
+            </section>
+            <section className="card">
+              <div className="section-head">
+                <h2>{t("投递记录", "Delivery history")}</h2>
+                <button
+                  onClick={() =>
+                    api("notification-jobs")
+                      .then(setNotificationJobs)
+                      .catch((e) => setError(e.message))
+                  }
+                >
+                  {t("刷新记录", "Refresh")}
+                </button>
+              </div>
+              <div className="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>{t("类型", "Type")}</th>
+                      <th>{t("状态", "State")}</th>
+                      <th>HTTP</th>
+                      <th>{t("次数", "Attempts")}</th>
+                      <th>{t("时间", "Time")}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {notificationJobs.map((j, i) => (
+                      <tr key={i}>
+                        <td>{j.kind}</td>
+                        <td>
+                          {j.state}
+                          <small>{j.error}</small>
+                        </td>
+                        <td>{j.status || "—"}</td>
+                        <td>{j.attempts}</td>
+                        <td>{new Date(j.time * 1000).toLocaleString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {!notificationJobs.length && (
+                  <div className="empty">
+                    {t("暂无投递记录", "No deliveries yet")}
+                  </div>
+                )}
+              </div>
+            </section>
+          </>
+        )}
+        {page === 6 && (
+          <section className="card">
+            <h2>{t("完整备份与恢复", "Full backup & restore")}</h2>
+            <p>
+              {t(
+                "备份包包含账号、下载器与站点配置、出口、通知设置、统计、运行记录和应用密钥，可导入另一处流量台。备份含敏感信息，请妥善保存。",
+                "Includes accounts, downloaders, sites, outlets, notification settings, statistics, logs and encryption key. Import into another Torrent Flow deployment. The archive contains sensitive data; keep it private.",
+              )}
+            </p>
+            <div className="toolbar">
+              <button
+                className="primary"
+                disabled={busy || demo}
+                onClick={() => {
+                  location.href = "/api/backup";
+                }}
+              >
+                <DownloadSimple />
+                {t("下载完整备份包", "Download full backup")}
+              </button>
+            </div>
+            <hr />
+            <h3>{t("从备份包恢复", "Restore from archive")}</h3>
+            <p className="hint">
+              {t(
+                "先停止各下载器策略并等待限速清空。导入校验通过后才覆盖，保留服务端回退备份；需要用备份中的账号重新登录，调速保持暂停。部署端口、域名和挂载由新环境配置。",
+                "Stop each downloader strategy and wait for clearance. Archives are validated before replacement; a rollback archive is retained. Sign in with the backup account afterwards; allocation remains paused. Configure ports, domains and mounts in the new environment.",
+              )}
+            </p>
+            <input
+              ref={backupInput}
+              hidden
+              type="file"
+              accept=".zip,application/zip"
+              onChange={(e) => setBackupFile(e.target.files?.[0] || null)}
+            />
+            <div className="toolbar">
+              <button
+                disabled={busy || demo}
+                onClick={() => backupInput.current?.click()}
+              >
+                {t("选择备份包", "Choose backup file")}
+              </button>
+              <span className="backup-filename">
+                {backupFile?.name || t("尚未选择备份包", "No backup selected")}
+              </span>
+              <button
+                className="primary"
+                disabled={busy || !backupFile || demo}
+                onClick={restoreBackup}
+              >
+                {t("导入并恢复", "Import & restore")}
+              </button>
+            </div>
+          </section>
+        )}
         {page === 4 && (
           <>
             <div className="setting-grid">
@@ -1471,13 +1969,6 @@ export function App() {
                   [
                     t("修改登录密码", "Change password"),
                     () => open("password", { current: "", password: "" }),
-                  ],
-                  [
-                    t(
-                      "关闭调速并恢复不限速",
-                      "Disable control & release limits",
-                    ),
-                    release,
                   ],
                 ].map(([label, fn]) => (
                   <button className="settings-action" key={label} onClick={fn}>
@@ -1540,6 +2031,7 @@ export function App() {
               <h2>
                 {
                   {
+                    notify: t("Webhook 与推送规则", "Webhook & delivery rules"),
                     client: t("下载器连接", "Downloader connection"),
                     site: t("站点配置", "Site settings"),
                     pool: t("带宽池", "Bandwidth pool"),
@@ -1561,6 +2053,71 @@ export function App() {
             </div>
             <form onSubmit={submit}>
               <div className="fields">
+                {modal === "notify" && (
+                  <>
+                    {toggle(
+                      "enabled",
+                      "启用 Webhook 通知",
+                      "Enable Webhook notifications",
+                    )}
+                    {field("url", "Webhook URL", "Webhook URL", "url", {
+                      required: true,
+                    })}
+                    {select("method", "请求方法", "Method", [
+                      ["POST", "POST"],
+                      ["PUT", "PUT"],
+                      ["PATCH", "PATCH"],
+                    ])}
+                    <label>
+                      {t("自定义请求头（JSON）", "Custom headers (JSON)")}
+                      <textarea
+                        value={form.headers || ""}
+                        placeholder={
+                          form.headersStored
+                            ? t(
+                                "请求头已保存，留空保留",
+                                "Saved headers; blank preserves",
+                              )
+                            : '{"Authorization":"Bearer ..."}'
+                        }
+                        onChange={(e) =>
+                          setForm({ ...form, headers: e.target.value })
+                        }
+                      />
+                    </label>
+                    {select("bodyType", "请求体格式", "Body format", [
+                      ["json", "JSON"],
+                      ["text", "Text"],
+                    ])}
+                    <label>
+                      {t("请求体模板", "Body template")}
+                      <textarea
+                        rows={5}
+                        value={form.bodyTemplate || ""}
+                        onChange={(e) =>
+                          setForm({ ...form, bodyTemplate: e.target.value })
+                        }
+                      />
+                    </label>
+                    <small>
+                      {t(
+                        "默认发送 title 和 content；支持 {{title}}、{{content}}、{{text}}、{{event}}、{{time}}、{{fields}}。",
+                        "Defaults to title and content. Supports {{title}}, {{content}}, {{text}}, {{event}}, {{time}}, {{fields}}.",
+                      )}
+                    </small>
+                    <h3>{t("报告与告警开关", "Report & alert switches")}</h3>
+                    {toggle("daily", "发送日报", "Daily report")}
+                    {toggle("weekly", "发送周报", "Weekly report")}
+                    {toggle("monthly", "发送月报", "Monthly report")}
+                    {toggle("alerts", "发送异常告警", "Operational alerts")}
+                    {field(
+                      "reportTime",
+                      "报告发送时间（系统时区）",
+                      "Report time (system timezone)",
+                      "time",
+                    )}
+                  </>
+                )}
                 {modal === "client" && (
                   <>
                     {field("name", "名称", "Name", "text", { required: true })}
@@ -1583,19 +2140,12 @@ export function App() {
                       "password",
                     )}
                     {select("pool", "所属带宽池", "Bandwidth pool", [
-                      ["", t("仅统计", "Statistics only")],
                       ...c.pools.map((p) => [p.id, p.name]),
                     ])}
-                    {toggle("enabled", "启用采集", "Enable monitoring")}
-                    {toggle(
-                      "autoManage",
-                      "自动接管活跃种子",
-                      "Automatically manage active torrents",
-                    )}
                     <small>
                       {t(
-                        "默认关闭。开启一次后，此下载器的新旧活跃种子自动参与所在带宽池分配，无需逐个勾选；无连接后释放。仍需先设置并开启带宽池，单个种子可另行排除。",
-                        "Off by default. Once enabled, existing and new active torrents join their uplink pool automatically; idle limits are released. Enable a configured pool first. Individual torrents can be excluded.",
+                        "所有已添加的下载器持续采集统计，自动调速可在下载器列表单独启动或停止。",
+                        "Monitoring remains active for every configured downloader. Start or stop rate allocation independently in the downloader list.",
                       )}
                     </small>
                   </>
@@ -1607,8 +2157,8 @@ export function App() {
                     })}
                     <small>
                       {t(
-                        "域名已从 Tracker 自动识别，通常只需修改名称。新站点默认权重 1、无最低保留、无额外封顶、关闭流量目标。",
-                        "Tracker domains are discovered automatically; usually just rename the site. New sites use weight 1, no reserved minimum, no extra cap and disabled traffic targets.",
+                        "域名自动识别，通常只需改名。默认权重 10，可降到 1 减少该站上传；每个活跃种子最低 50 KB/s。",
+                        "Tracker domains are discovered automatically. Default site weight is 10; lower it to reduce upload priority. Each active torrent has a fixed 50 KB/s minimum.",
                       )}
                     </small>
                     <details className="advanced-fields" open={!form.automatic}>
@@ -1642,22 +2192,22 @@ export function App() {
                     </details>
                     <small>
                       {t(
-                        "推荐权重 1 表示同等分配；改为 3 可获得约三倍的剩余额度。最低额度 0 不预留带宽，空闲站点不占额度。",
-                        "Recommended weight 1 shares equally; weight 3 receives roughly three times the spare allowance. Minimum 0 reserves no bandwidth; idle sites consume none.",
+                        "先按站点权重分配，再由站内种子平分。最低额度不足时调整；最低额度合计超出口预算时允许超出并警告，不降低最低额度。",
+                        "Allocate by site weight, then split equally within each site. Fixed per-torrent minimums take precedence, even above the outlet budget, with a warning.",
                       )}
                     </small>
                     <div className="field-pair">
                       {field(
                         "weight",
-                        "优先权重 1–1000",
-                        "Priority weight 1–1000",
+                        "站点权重 1–10（默认 10）",
+                        "Site weight 1–10 (default 10)",
                         "number",
-                        { min: 1, max: 1000 },
+                        { min: 1, max: 10 },
                       )}
                       {field(
                         "minimum",
-                        "最低额度 MiB/s",
-                        "Minimum MiB/s",
+                        "每种子最低额度 KB/s（默认 50）",
+                        "Minimum per torrent KB/s (default 50)",
                         "number",
                         { min: 0, step: 0.001 },
                       )}
@@ -1671,8 +2221,8 @@ export function App() {
                     )}
                     <small>
                       {t(
-                        "最高额度 0 表示只受带宽池约束；日/月目标 0 表示关闭，建议先保持默认。启用目标后，达标仍保留默认 0.05 MiB/s 低速额度，不暂停种子。",
-                        "Maximum 0 uses only the pool limit. Daily/monthly target 0 disables targets; keep these defaults initially. Enabled targets switch to a 0.05 MiB/s allowance after reaching the target, without pausing torrents.",
+                        "最高额度与达标后额度是站点总额度；若低于活跃种子最低额度合计，以种子最低额度为准并提示。日/月目标 0 表示关闭。",
+                        "Site caps and after-target allowances cannot lower the fixed per-torrent minimum. Conflicts produce a warning. Daily/monthly target 0 disables targets.",
                       )}
                     </small>
                     <div className="field-pair">
@@ -1705,20 +2255,15 @@ export function App() {
                     {field("name", "名称", "Name", "text", { required: true })}
                     {field(
                       "budget",
-                      "总上传额度 MiB/s",
-                      "Upload budget MiB/s",
+                      "出口上传带宽 Mbps（默认 50）",
+                      "Outlet upload bandwidth Mbps (default 50)",
                       "number",
-                      { required: true, min: 0.001, step: 0.001 },
-                    )}
-                    {toggle(
-                      "enabled",
-                      "启用自动分配（需要恢复保护在线）",
-                      "Enable allocation (recovery protection required)",
+                      { required: true, min: 0.001, step: "any" },
                     )}
                     <small>
                       {t(
-                        "首个带宽池会自动关联未分组下载器；不同出口请另建带宽池。默认 1 MiB/s 是示例，不是实测网速。下载器开启自动接管后无需逐个设置。",
-                        "The first pool automatically includes unassigned downloaders. Budget 1 MiB/s is an editable example, not a measured uplink speed. Enable downloader automatic management to avoid per-torrent setup.",
+                        "默认出口 50 Mbps = 6.25 MB/s ≈ 5.96 MiB/s，不是 7 MiB/s。下载器默认绑定；可按实际出口修改，由顶部总开关管理调速，统计始终运行。",
+                        "Default outlet is 50 Mbps (6.25 MB/s, about 5.96 MiB/s). Downloaders bind automatically. Edit it for your uplink; the master switch controls allocation while monitoring always runs.",
                       )}
                     </small>
                   </>
@@ -1734,18 +2279,6 @@ export function App() {
                         ["", t("自动匹配", "Automatic matching")],
                         ...c.sites.map((s) => [s.id, s.name]),
                       ],
-                    )}
-                    {field(
-                      "weight",
-                      "种子内分配权重",
-                      "Torrent allocation weight",
-                      "number",
-                      { min: 1, max: 1000 },
-                    )}
-                    {toggle(
-                      "manage",
-                      "允许系统接管此种子上传限速",
-                      "Allow system to manage this torrent upload limit",
                     )}
                     <small>
                       {t(
@@ -1853,6 +2386,11 @@ export function App() {
                       {t("删除", "Delete")}
                     </button>
                   )}
+                {modal === "notify" && (
+                  <button type="button" onClick={testWebhook} disabled={busy}>
+                    {t("测试当前配置", "Test draft")}
+                  </button>
+                )}
                 {modal === "client" && (
                   <button type="button" onClick={testClient} disabled={busy}>
                     <Broadcast />

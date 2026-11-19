@@ -28,7 +28,7 @@ func newEngine(s *Store) *Engine {
 func (e *Engine) get(c Client) *Adapter {
 	c = normalizeClient(c)
 	a := e.adapters[c.ID]
-	if a == nil || a.c != c {
+	if a == nil || a.c.ID != c.ID || a.c.Kind != c.Kind || a.c.URL != c.URL || a.c.User != c.User || a.c.Password != c.Password {
 		a = adapter(c)
 		e.adapters[c.ID] = a
 	}
@@ -45,6 +45,32 @@ func (e *Engine) tick(ctx context.Context) {
 	c, err := e.s.config()
 	if err != nil {
 		return
+	}
+	changed := false
+	for i, cl := range c.Clients {
+		if cl.ClearPending {
+			one := c
+			one.Clients = []Client{cl}
+			if e.clearAll(ctx, one) == nil {
+				c.Clients[i].ClearPending = false
+				changed = true
+			}
+		}
+	}
+	if changed {
+		c.Revision++
+		if e.s.saveConfig(c) != nil {
+			return
+		}
+	}
+	if c.ClearPending {
+		if e.clearAll(ctx, c) == nil {
+			c.ClearPending = false
+			c.Revision++
+			if e.s.saveConfig(c) != nil {
+				return
+			}
+		}
 	}
 	locNow, _ := time.LoadLocation(c.Timezone)
 	now := time.Now().In(locNow)
@@ -98,6 +124,25 @@ func (e *Engine) tick(ctx context.Context) {
 		}
 		for i := range items {
 			items[i].Site, items[i].Ambiguous = siteFor(items[i], c)
+			if items[i].Site == "" {
+				for _, raw := range items[i].Trackers {
+					if items[i].Site != "" {
+						break
+					}
+					for _, site := range c.Sites {
+						one := c
+						one.Sites = []Site{site}
+						one.Overrides = map[string]Override{}
+						if id, _ := siteFor(Torrent{Trackers: []string{raw}}, one); id != "" {
+							items[i].Site = id
+							break
+						}
+					}
+				}
+				if items[i].Site == "" {
+					items[i].Site = "tracker-unavailable"
+				}
+			}
 			items[i].State = "monitoring"
 			if e.suspended[items[i].Key] {
 				items[i].State = "external limit change"
@@ -145,7 +190,7 @@ func (e *Engine) tick(ctx context.Context) {
 		mu[b.Site] += b.Up
 	}
 	for _, pool := range c.Pools {
-		if !pool.Enabled {
+		if !pool.Enabled || !policyOn(c) {
 			continue
 		}
 		groups := map[string][]Torrent{}
@@ -157,10 +202,10 @@ func (e *Engine) tick(ctx context.Context) {
 					break
 				}
 			}
-			if cl.Pool != pool.ID || !c.manages(t) || t.Site == "" || e.suspended[t.Key] {
+			if cl.Pool != pool.ID || !clientPolicyOn(cl) || t.Site == "" || e.suspended[t.Key] {
 				continue
 			}
-			if t.Connections > 0 {
+			if t.Connections > 0 || t.Up > 0 {
 				e.idle[t.Key] = now
 			} else {
 				since, ok := e.idle[t.Key]
@@ -175,50 +220,70 @@ func (e *Engine) tick(ctx context.Context) {
 			groups[t.Site] = append(groups[t.Site], t)
 		}
 		var siteItems []Allocation
-		feasible := true
+		floors := map[string]int64{}
+		var totalFloor int64
 		for id, ts := range groups {
 			s := sites[id]
+			perSeed := s.Minimum
+			if perSeed < 1000 {
+				perSeed = 1000
+			}
+			floor := int64(len(ts)) * ((perSeed + 999) / 1000 * 1000)
 			maximum := s.Maximum
-			min := s.Minimum
 			if s.DayTarget > 0 && du[id] >= s.DayTarget || s.MonthTarget > 0 && mu[id] >= s.MonthTarget {
-				if maximum == 0 || maximum > s.AfterTarget {
-					maximum = s.AfterTarget
-				}
-				if min > maximum {
-					min = maximum
-				}
+				maximum = s.AfterTarget
 			}
-			if min < int64(len(ts))*1000 {
-				min = int64(len(ts)) * 1000
+			if maximum > 0 && maximum < floor {
+				maximum = floor
+				warnings = append(warnings, "站点最低额度高于配置上限，保留最低额度 / Minimum takes precedence over site cap")
 			}
-			if maximum > 0 && maximum < min {
-				feasible = false
-			}
-			siteItems = append(siteItems, Allocation{id, s.Weight, min, maximum})
+			floors[id] = floor
+			totalFloor += floor
+			siteItems = append(siteItems, Allocation{id, s.Weight, 0, maximum})
 		}
-		if !feasible {
-			warnings = append(warnings, "Pool "+pool.Name+": active torrents exceed the configured cap at client rate resolution; control released")
-			continue
-		}
-		siteBudgets := allocate(pool.Budget, siteItems)
-		if len(siteBudgets) != len(siteItems) {
-			warnings = append(warnings, "Pool "+pool.Name+": budget cannot satisfy active minimum allowances; control released")
-			continue
+		siteBudgets, exceeded := allocateSiteShares(pool.Budget, siteItems, floors)
+		if exceeded {
+			warnings = append(warnings, fmt.Sprintf("出口 %s：最低额度合计 %d KB/s，超过预算 %d KB/s；最低额度保持不变 / Minimum allowances exceed outlet budget", pool.Name, totalFloor/1000, pool.Budget/1000))
 		}
 		for site, ts := range groups {
 			var items []Allocation
 			for _, t := range ts {
-				o := c.Overrides[t.Key]
-				w := o.Weight
+				w := int64(1)
 				if w < 1 {
 					w = 1
 				}
-				items = append(items, Allocation{t.Key, w, 1000, 0})
+				items = append(items, Allocation{t.Key, w, 0, 0})
 			}
 			for k, v := range allocate(siteBudgets[site], items) {
 				targets[k] = v / 1000 * 1000
 			}
 		}
+	}
+	owned := map[string]bool{}
+	confirmed := map[string]int64{}
+	leaseRows, leaseErr := e.s.db.Query("SELECT k,last,state FROM leases")
+	if leaseErr != nil {
+		warnings = append(warnings, "限速归属不可读取，本轮不写入 / Ownership journal unavailable")
+		return
+	}
+	for leaseRows.Next() {
+		var key, state string
+		var last int64
+		if err := leaseRows.Scan(&key, &last, &state); err != nil {
+			leaseRows.Close()
+			warnings = append(warnings, "限速归属记录损坏 / Invalid ownership journal")
+			return
+		}
+		owned[key] = true
+		if state == "confirmed" {
+			confirmed[key] = last
+		}
+	}
+	leaseReadErr := leaseRows.Err()
+	leaseRows.Close()
+	if leaseReadErr != nil {
+		warnings = append(warnings, "限速归属读取失败 / Ownership journal read failed")
+		return
 	}
 	for i := range all {
 		t := &all[i]
@@ -229,6 +294,11 @@ func (e *Engine) tick(ctx context.Context) {
 					cl = v
 				}
 			}
+			if last, ok := confirmed[t.Key]; ok && last == normalizedLimit(cl, v) && t.Limit == last {
+				t.Managed = true
+				t.State = "allocated"
+				continue
+			}
 			err := e.apply(ctx, cl, *t, v)
 			if err != nil {
 				t.State = err.Error()
@@ -238,9 +308,13 @@ func (e *Engine) tick(ctx context.Context) {
 				t.Limit = normalizedLimit(cl, v)
 			}
 		} else {
-			if err := e.releaseKey(ctx, c, t.Key); err != nil {
-				t.State = "release pending"
-			} else if t.Connections == 0 {
+			if owned[t.Key] {
+				if err := e.releaseKey(ctx, c, t.Key); err != nil {
+					t.State = "release pending"
+				} else if t.Connections == 0 && t.Up == 0 {
+					t.State = "released"
+				}
+			} else if t.Connections == 0 && t.Up == 0 {
 				t.State = "released"
 			}
 		}
@@ -288,6 +362,9 @@ func (e *Engine) apply(ctx context.Context, cl Client, t Torrent, target int64) 
 	exists := err == nil
 	if err != nil && err != sql.ErrNoRows {
 		return err
+	}
+	if exists && state == "confirmed" && last == target && t.Limit == target {
+		return tx.Commit()
 	}
 	a := e.get(cl)
 	actual, err := a.readLimit(ctx, t.Hash)
@@ -348,6 +425,7 @@ func (e *Engine) apply(ctx context.Context, cl Client, t Torrent, target int64) 
 		return fmt.Errorf("limit not confirmed")
 	}
 	tx.Exec("UPDATE leases SET last=?,state='confirmed',at=? WHERE k=?", target, time.Now().Unix(), t.Key)
+	event(tx, "allocated", t.Key, fmt.Sprintf("上传限速已确认 / Upload limit confirmed: %d B/s", target))
 	return tx.Commit()
 }
 func (e *Engine) releaseKey(ctx context.Context, c Config, key string) error {

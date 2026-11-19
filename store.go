@@ -103,6 +103,7 @@ CREATE TABLE IF NOT EXISTS leases(k TEXT PRIMARY KEY,client TEXT,hash TEXT,origi
 CREATE TABLE IF NOT EXISTS control_blocks(k TEXT PRIMARY KEY,at INTEGER);
 CREATE TABLE IF NOT EXISTS events(id INTEGER PRIMARY KEY,at INTEGER,kind TEXT,k TEXT,message TEXT);
 CREATE TABLE IF NOT EXISTS sessions(token TEXT PRIMARY KEY,csrf TEXT,expires INTEGER);
+CREATE TABLE IF NOT EXISTS notification_jobs(id TEXT PRIMARY KEY,kind TEXT,title TEXT,content TEXT,at INTEGER,next INTEGER,attempts INTEGER,state TEXT,status INTEGER,error TEXT);
 `)
 		if e == nil || !strings.Contains(e.Error(), "locked") {
 			break
@@ -146,6 +147,29 @@ func (s *Store) config() (Config, error) {
 	b, e = s.unseal(b)
 	if e == nil {
 		e = json.Unmarshal(b, &c)
+	}
+	if e == nil && c.PolicyVersion < 1 {
+		if len(c.Pools) == 0 {
+			c.Pools = []Pool{{ID: "default-outlet", Name: "默认出口 · 50 Mbps", Budget: 6250000, Enabled: true}}
+		}
+		for i := range c.Clients {
+			c.Clients[i].Enabled = true
+			if c.Clients[i].Pool == "" {
+				c.Clients[i].Pool = c.Pools[0].ID
+			}
+		}
+		for i := range c.Sites {
+			if c.Sites[i].Weight > 10 {
+				c.Sites[i].Weight = 10
+			}
+			if c.Sites[i].Minimum == 0 {
+				c.Sites[i].Minimum = 50000
+			}
+		}
+		for i := range c.Pools {
+			c.Pools[i].Enabled = true
+		}
+		c.PolicyVersion = 1
 	}
 	return c, e
 }

@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.1.5
+
+- Independently start/stop automatic allocation for each downloader while keeping monitoring active; stopping clears torrent-level limits and persists failed clearance.
+- Share outlet budgets across downloaders, provide a default 50 Mbps outlet, use site weights 1–10 (default 10), and preserve fixed per-torrent minimums even above budget with warnings.
+- Apply proportional total site shares before floor adjustments and split equally inside a site.
+- Show downloader/Tracker identity and active pending/failed torrents; simplify overview and display assigned outlets directly.
+- Add API pagination/search, bounded tracker metadata queries, unchanged-limit fast paths and serialized browser polling.
+- Move explicit day/week/month/year selection into statistics; preserve one-year retention semantics.
+- Add portable full backups using the Movie project archive validator, atomic logical restores, credential re-encryption, rollback archives and session revocation.
+- Add Gallery-style Webhook draft tests/templates and persisted daily/weekly/monthly reports, cooldown alerts, bounded retries and delivery history.
+
+
 ## 0.1.4
 
 - Discover Tracker hostnames automatically, preserve renamed sites and existing manual rules, and keep passkeys out of site settings and UI.

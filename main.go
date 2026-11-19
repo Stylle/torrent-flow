@@ -47,11 +47,12 @@ func main() {
 		log.Print("Embedded recovery enabled; whole-container outages require restart or an optional external guardian")
 	}
 	sv := &Server{e: e, s: s, attempts: map[string][]time.Time{}}
+	go sv.notifications(ctx)
 	addr := os.Getenv("LISTEN_ADDR")
 	if addr == "" {
 		addr = ":8080"
 	}
-	server := &http.Server{Addr: addr, Handler: sv.handler(), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 90 * time.Second, IdleTimeout: 60 * time.Second}
+	server := &http.Server{Addr: addr, Handler: sv.handler(), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 120 * time.Second, WriteTimeout: 300 * time.Second, IdleTimeout: 60 * time.Second}
 	done := make(chan struct{})
 	go func() { defer close(done); e.run(ctx) }()
 	go func() {
