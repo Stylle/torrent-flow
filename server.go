@@ -319,6 +319,7 @@ func (sv *Server) save(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	for i := range c.Clients {
+		c.Clients[i] = normalizeClient(c.Clients[i])
 		for _, o := range old.Clients {
 			if c.Clients[i].ID == o.ID && c.Clients[i].Password == "" {
 				c.Clients[i].Password = o.Password
@@ -417,6 +418,7 @@ func (sv *Server) testClient(w http.ResponseWriter, r *http.Request) {
 		failHTTP(w, 400, "invalid downloader")
 		return
 	}
+	cl = normalizeClient(cl)
 	c, _ := sv.s.config()
 	for _, old := range c.Clients {
 		if cl.ID == old.ID && cl.Password == "" {
@@ -430,12 +432,13 @@ func (sv *Server) testClient(w http.ResponseWriter, r *http.Request) {
 		failHTTP(w, 400, err.Error())
 		return
 	}
-	items, err := adapter(cl).list(r.Context())
+	a := adapter(cl)
+	items, err := a.list(r.Context())
 	if err != nil {
 		failHTTP(w, 502, err.Error())
 		return
 	}
-	jsonOut(w, map[string]any{"ok": true, "torrents": len(items)})
+	jsonOut(w, map[string]any{"ok": true, "torrents": len(items), "endpoint": a.endpoint})
 }
 func (sv *Server) release(w http.ResponseWriter, r *http.Request) {
 	sv.e.mu.Lock()

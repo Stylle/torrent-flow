@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.3
+
+- Keep form dialogs open when their backdrop is clicked; preserve explicit close/cancel and keyboard dismissal.
+- Fix touch navigation scrim inheriting button hover/active styles; lock background scrolling and clear drawer state when resizing to desktop.
+- Normalize common Transmission base/Web URLs to RPC, preserve POST/session negotiation through bounded same-origin redirects, and reject cross-origin credential forwarding.
+- Return to independent guardian deployment by default, prioritizing recovery while the main container is stopped, following the user's revised requirement.
+- Add a concrete 1 MiB/s combined qBittorrent/Transmission budget guide with site weights, floors and unit explanations.
+
 ## 0.1.2
 
 - Fix creation of downloaders, sites and bandwidth pools on ordinary LAN HTTP origins by using a cryptographically secure UUID fallback.

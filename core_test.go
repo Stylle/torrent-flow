@@ -76,6 +76,18 @@ func TestDomainAndRegex(t *testing.T) {
 	}
 }
 
+func TestOneMiBBudgetGuide(t *testing.T) {
+	const budget int64 = 1048576
+	floor := budget / 10
+	out := allocate(budget, []Allocation{{"site-a", 3, floor, 0}, {"site-b", 1, floor, 0}})
+	if out["site-a"]+out["site-b"] != budget {
+		t.Fatal("example exceeds or loses total budget")
+	}
+	if out["site-a"] < 734001 || out["site-a"] > 734006 || out["site-b"] < 314570 || out["site-b"] > 314575 {
+		t.Fatal("guide 3:1 weights do not match allocator")
+	}
+}
+
 func TestOldHourlyRowsPreserved(t *testing.T) {
 	s := testStore(t)
 	now := time.Date(2026, 11, 19, 1, 10, 0, 0, time.UTC)

@@ -26,6 +26,7 @@ func newEngine(s *Store) *Engine {
 	return &Engine{s: s, idle: map[string]time.Time{}, suspended: map[string]bool{}, adapters: map[string]*Adapter{}, torrents: []Torrent{}, statuses: []ClientStatus{}}
 }
 func (e *Engine) get(c Client) *Adapter {
+	c = normalizeClient(c)
 	a := e.adapters[c.ID]
 	if a == nil || a.c != c {
 		a = adapter(c)

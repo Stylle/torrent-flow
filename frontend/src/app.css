@@ -672,18 +672,25 @@ input.search {
 @media (max-width: 1000px) {
   .sidebar {
     transform: translateX(-100%);
+    visibility: hidden;
+    pointer-events: none;
   }
   .sidebar.open {
     transform: translateX(0);
+    visibility: visible;
+    pointer-events: auto;
   }
   .backdrop-nav {
     display: block;
     position: fixed;
     inset: 0;
-    background: #13231d44;
+    background: #00000055;
     z-index: 25;
     border-radius: 0;
     border: 0;
+    padding: 0;
+    touch-action: none;
+    -webkit-tap-highlight-color: transparent;
   }
   .main {
     margin-left: 0;

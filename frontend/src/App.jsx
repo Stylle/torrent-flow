@@ -59,7 +59,7 @@ function demoData() {
       afterTarget: MB,
     }));
   return {
-    version: "0.1.2",
+    version: "0.1.3",
     config: {
       revision: 0,
       timezone: "Asia/Shanghai",
@@ -287,6 +287,33 @@ export function App() {
       previous?.focus();
     };
   }, [modal, busy]);
+  useEffect(() => {
+    const mobile = matchMedia("(max-width: 1000px)");
+    const resize = () => {
+      if (!mobile.matches) setMenu(false);
+    };
+    const key = (e) => {
+      if (e.key === "Escape") setMenu(false);
+    };
+    mobile.addEventListener("change", resize);
+    document.addEventListener("keydown", key);
+    return () => {
+      mobile.removeEventListener("change", resize);
+      document.removeEventListener("keydown", key);
+    };
+  }, []);
+  useEffect(() => {
+    if (!modal && !(menu && matchMedia("(max-width: 1000px)").matches)) return;
+    const oldOverflow = document.body.style.overflow,
+      oldPadding = document.body.style.paddingRight;
+    const gap = innerWidth - document.documentElement.clientWidth;
+    document.body.style.overflow = "hidden";
+    if (gap > 0) document.body.style.paddingRight = `${gap}px`;
+    return () => {
+      document.body.style.overflow = oldOverflow;
+      document.body.style.paddingRight = oldPadding;
+    };
+  }, [modal, menu]);
   async function api(path, body) {
     const r = await fetch("/api/" + path, {
       method: body === undefined ? "GET" : "POST",
@@ -544,6 +571,9 @@ export function App() {
     setBusy(true);
     try {
       const v = demo ? { torrents: 3 } : await api("test-client", form);
+      if (form.kind === "tr" && v.endpoint) {
+        setForm((f) => ({ ...f, url: v.endpoint }));
+      }
       setToast(
         t(
           `连接成功，发现 ${v.torrents} 个种子`,
@@ -926,9 +956,9 @@ export function App() {
   return (
     <div>
       {menu && (
-        <button
+        <div
           className="backdrop-nav"
-          aria-label={t("收起菜单", "Close navigation")}
+          aria-hidden="true"
           onClick={() => setMenu(false)}
         />
       )}
@@ -940,7 +970,7 @@ export function App() {
             <small>Torrent Flow</small>
           </div>
         </div>
-        <nav className="nav">
+        <nav className="nav" id="main-navigation">
           {names.map((name, i) => {
             const I = nav[i];
             return (
@@ -969,6 +999,8 @@ export function App() {
           <button
             className="icon menu-toggle"
             aria-label={t("打开菜单", "Open navigation")}
+            aria-expanded={menu}
+            aria-controls="main-navigation"
             onClick={() => setMenu(!menu)}
           >
             <List size={22} />
@@ -1247,8 +1279,8 @@ export function App() {
             </div>
             <div className="notice">
               {t(
-                "不同出口使用不同带宽池。默认内置恢复保护；整个容器停止期间不能解除限速，重启后恢复。外置守护为可选项，最低额度不代表实际速度。",
-                "Use separate uplink pools. Embedded recovery restores limits on restart, but cannot act while the whole container is stopped. An external guardian is optional. Allowances do not guarantee actual speed.",
+                "不同出口使用不同带宽池。默认使用独立守护，主容器停止后仍能恢复系统限速；守护或下载器也离线时需等恢复连接。最低额度不代表实际速度。",
+                "Use separate uplink pools. The default independent guardian can recover limits while the main container is stopped. Recovery waits if the guardian or downloader is unreachable. Allowances do not guarantee actual speed.",
               )}
             </div>
             {c.pools.map((p) => (
@@ -1467,12 +1499,7 @@ export function App() {
         </div>
       )}
       {modal && (
-        <div
-          className="backdrop"
-          onClick={(e) =>
-            e.target === e.currentTarget && !busy && setModal(null)
-          }
-        >
+        <div className="backdrop">
           <section
             className="modal"
             role="dialog"
@@ -1614,7 +1641,7 @@ export function App() {
                       "总上传额度 MiB/s",
                       "Upload budget MiB/s",
                       "number",
-                      { required: true, min: 0.01, step: 0.01 },
+                      { required: true, min: 0.001, step: 0.001 },
                     )}
                     {toggle(
                       "enabled",

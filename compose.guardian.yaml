@@ -1,4 +1,5 @@
-# Optional: docker compose -f compose.yaml -f compose.guardian.yaml up -d
+# Compatibility override for older single-service Compose files.
+# Current compose.yaml already includes this guardian; no override is needed.
 services:
   torrent-flow:
     environment:

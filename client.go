@@ -23,6 +23,7 @@ type Adapter struct {
 	session      string
 	trackerCache map[string]trackerEntry
 	progress     func()
+	endpoint     string
 }
 type trackerEntry struct {
 	urls []string
@@ -30,8 +31,58 @@ type trackerEntry struct {
 }
 
 func adapter(c Client) *Adapter {
+	c = normalizeClient(c)
 	jar, _ := cookiejar.New(nil)
-	return &Adapter{c: c, http: &http.Client{Timeout: 5 * time.Second, Jar: jar, CheckRedirect: func(r *http.Request, via []*http.Request) error { return http.ErrUseLastResponse }}}
+	return &Adapter{c: c, endpoint: c.URL, http: &http.Client{Timeout: 5 * time.Second, Jar: jar, CheckRedirect: func(r *http.Request, via []*http.Request) error { return http.ErrUseLastResponse }}}
+}
+func normalizeClient(c Client) Client {
+	c.URL = strings.TrimSpace(c.URL)
+	if c.Kind != "tr" {
+		return c
+	}
+	u, e := url.Parse(c.URL)
+	if e != nil {
+		return c
+	}
+	p := strings.TrimRight(u.Path, "/")
+	lower := strings.ToLower(p)
+	isWeb := strings.HasSuffix(lower, "/web") || strings.Contains(lower, "/web/")
+	switch {
+	case p == "":
+		p = "/transmission/rpc"
+	case strings.HasSuffix(lower, "/transmission"):
+		p += "/rpc"
+	case strings.HasSuffix(lower, "/web"):
+		p = p[:len(p)-4] + "/rpc"
+	case strings.Contains(lower, "/web/"):
+		p = p[:strings.Index(lower, "/web/")] + "/rpc"
+	}
+	u.Path = p
+	u.RawPath = ""
+	u.Fragment = ""
+	if isWeb {
+		u.RawQuery = ""
+	}
+	c.URL = u.String()
+	return c
+}
+func effectivePort(u *url.URL) string {
+	if u.Port() != "" {
+		return u.Port()
+	}
+	if u.Scheme == "https" {
+		return "443"
+	}
+	return "80"
+}
+func safeRPCDestination(base, target *url.URL) bool {
+	if target.User != nil || !strings.EqualFold(base.Hostname(), target.Hostname()) {
+		return false
+	}
+	if target.Scheme == base.Scheme {
+		return effectivePort(base) == effectivePort(target)
+	}
+	return base.Scheme == "http" && target.Scheme == "https" && (effectivePort(base) == effectivePort(target) || (effectivePort(base) == "80" && effectivePort(target) == "443"))
 }
 func (a *Adapter) request(ctx context.Context, path string, body []byte, ctype string) ([]byte, int, error) {
 	method := "GET"
@@ -39,31 +90,56 @@ func (a *Adapter) request(ctx context.Context, path string, body []byte, ctype s
 		method = "POST"
 	}
 	u := strings.TrimRight(a.c.URL, "/") + path
-	req, e := http.NewRequestWithContext(ctx, method, u, bytes.NewReader(body))
-	if e != nil {
-		return nil, 0, fmt.Errorf("invalid downloader request")
+	if a.c.Kind == "tr" && a.endpoint != "" {
+		u = a.endpoint
 	}
-	if ctype != "" {
-		req.Header.Set("Content-Type", ctype)
-	}
-	if a.c.Kind == "tr" {
-		req.SetBasicAuth(a.c.User, a.c.Password)
-		if a.session != "" {
-			req.Header.Set("X-Transmission-Session-Id", a.session)
+	base, _ := url.Parse(a.c.URL)
+	for hop := 0; hop < 4; hop++ {
+		req, e := http.NewRequestWithContext(ctx, method, u, bytes.NewReader(body))
+		if e != nil {
+			return nil, 0, fmt.Errorf("invalid downloader request")
 		}
-	} else {
-		req.Header.Set("Referer", strings.TrimRight(a.c.URL, "/")+"/")
+		if ctype != "" {
+			req.Header.Set("Content-Type", ctype)
+		}
+		if a.c.Kind == "tr" {
+			req.SetBasicAuth(a.c.User, a.c.Password)
+			if a.session != "" {
+				req.Header.Set("X-Transmission-Session-Id", a.session)
+			}
+		} else {
+			req.Header.Set("Referer", strings.TrimRight(a.c.URL, "/")+"/")
+		}
+		r, e := a.http.Do(req)
+		if e != nil {
+			return nil, 0, fmt.Errorf("downloader unreachable or request timed out")
+		}
+		defer r.Body.Close()
+		if a.c.Kind == "tr" && (r.StatusCode == 301 || r.StatusCode == 302 || r.StatusCode == 307 || r.StatusCode == 308) {
+			current, _ := url.Parse(u)
+			location, e := r.Location()
+			io.Copy(io.Discard, io.LimitReader(r.Body, 4096))
+			r.Body.Close()
+			if e != nil {
+				return nil, r.StatusCode, fmt.Errorf("Transmission redirect has no valid destination")
+			}
+			target := current.ResolveReference(location)
+			if !safeRPCDestination(base, target) || !safeRPCDestination(current, target) {
+				return nil, r.StatusCode, fmt.Errorf("Transmission redirects to another host/port or an insecure address; enter the final RPC address explicitly")
+			}
+			u = target.String()
+			continue
+		}
+		if a.c.Kind == "tr" {
+			a.endpoint = u
+		}
+		if a.c.Kind == "tr" && r.StatusCode == 409 {
+			a.session = r.Header.Get("X-Transmission-Session-Id")
+		}
+		b, e := io.ReadAll(io.LimitReader(r.Body, 32<<20))
+		return b, r.StatusCode, e
 	}
-	r, e := a.http.Do(req)
-	if e != nil {
-		return nil, 0, fmt.Errorf("downloader unreachable or request timed out")
-	}
-	defer r.Body.Close()
-	if a.c.Kind == "tr" && r.StatusCode == 409 {
-		a.session = r.Header.Get("X-Transmission-Session-Id")
-	}
-	b, e := io.ReadAll(io.LimitReader(r.Body, 32<<20))
-	return b, r.StatusCode, e
+	return nil, 0, fmt.Errorf("Transmission RPC redirect loop; check RPC endpoint")
 }
 func (a *Adapter) qb(ctx context.Context, path string, form url.Values) ([]byte, error) {
 	var body []byte
@@ -98,17 +174,28 @@ func (a *Adapter) rpc(ctx context.Context, method string, args any, out any) err
 			return e
 		}
 		if status == 409 {
+			if a.session == "" {
+				return fmt.Errorf("Transmission session header missing; check reverse proxy X-Transmission-Session-Id forwarding")
+			}
 			continue
 		}
 		if status != 200 {
-			return fmt.Errorf("Transmission API returned HTTP %d", status)
+			switch status {
+			case 401:
+				return fmt.Errorf("Transmission RPC HTTP 401: check RPC username/password")
+			case 403, 421:
+				return fmt.Errorf("Transmission RPC HTTP %d: check RPC IP/host whitelist and proxy access policy", status)
+			case 404:
+				return fmt.Errorf("Transmission RPC HTTP 404: check RPC path (usually /transmission/rpc)")
+			}
+			return fmt.Errorf("Transmission RPC returned HTTP %d", status)
 		}
 		var result struct {
 			Result    string          `json:"result"`
 			Arguments json.RawMessage `json:"arguments"`
 		}
 		if e = json.Unmarshal(b, &result); e != nil {
-			return fmt.Errorf("invalid Transmission response")
+			return fmt.Errorf("Transmission response is not RPC JSON; use the RPC address rather than the Web login page")
 		}
 		if result.Result != "success" {
 			return fmt.Errorf("Transmission request rejected")

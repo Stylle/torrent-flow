@@ -26,11 +26,11 @@ docker exec torrent-flow cat /data/initial-password.txt
 
 镜像会准备挂载目录后降权为 UID/GID 10001，普通可写 Docker 绑定目录或 named volume 即可。无需另外创建 data-init 服务。若显式指定 `user:` 或挂载为只读，需要自行授予该用户写入数据目录的权限。
 
-默认只部署一个容器，内置恢复任务，不需要 Redis、外部数据库、额外初始化服务。进程异常后由 Docker 重启，启动时恢复系统限速。整个容器被停止、强杀或主机断电期间，内置任务无法运行；需要这段时间也能恢复时，才使用可选 `compose.guardian.yaml`：`docker compose -f compose.yaml -f compose.guardian.yaml up -d`。可选模式设置 EXTERNAL_GUARDIAN=true 并运行独立守护。
+默认部署两个容器：主程序负责界面/统计/调度，独立 guardian 只负责主程序掉线后的限速恢复，不是初始化容器。按最新恢复要求，主容器停止期间也需要解除系统限速，因此默认配置 `EXTERNAL_GUARDIAN=true`。二者共享同一个 data 目录，不需要外部数据库、Redis 或额外初始化服务。守护、下载器或主机也不可达时，仍需等待连接恢复。
 
-不要把下载器的 WebUI 暴露到公网。访问地址必须从容器内部可达；Transmission 填完整 RPC 地址，如 `http://nas:9091/transmission/rpc`。测试按钮使用当前表单，密码留空则使用已有保存值，不要求先保存。
+不要把下载器的 WebUI 暴露到公网。访问地址必须从容器内部可达；Transmission 可填 `http://nas:9091` 或完整 RPC 地址；常见 `/transmission/web/` 地址会自动转换为 `/transmission/rpc`。同主机的 RPC 重定向保留 POST 和会话协商，跨主机/端口跳转会拒绝携带凭据，需明确填写最终 RPC 地址。测试按钮使用当前表单，密码留空则使用已有保存值，不要求先保存。
 
-从 0.1.0 双容器部署升级：先在后台关闭调速并恢复系统限速，替换为新版 `compose.yaml`，执行 `docker compose up -d --remove-orphans` 移除旧守护服务。保留原 `data/`；不要使用 `down -v`。只更新镜像而不替换旧 Compose，不会自动删除你原来定义的第二个容器。
+升级时保留原 data 目录和原部署位置，用当前 `compose.yaml` 更新两个服务，执行 `docker compose pull`、`docker compose up -d`。不要使用 `down -v`。0.1.1/0.1.2 用户更新时会重新加入独立守护；原有双容器用户沿用这两个服务即可。
 
 ## 使用顺序
 
@@ -47,9 +47,9 @@ docker exec torrent-flow cat /data/initial-password.txt
 ## 断线与恢复
 
 - 正常关闭、关闭调速、解除接管、无连接：只解除系统接管的种子限速，其他个人限速不变。
-- 默认单容器：内置恢复任务检查心跳；整个进程退出时依赖 Docker 重启，启动时恢复限速。整个容器停止期间不能远程解除限速。
-- 可选独立 guardian：即使主容器停止，仍可在心跳超过约 30 秒后恢复限速；恢复失败保留队列重试。
-- 网络中断、下载器或整台主机也关机、守护同时停止：无法远程修改下载器，待重新可达后继续恢复。如可选模式下同时关闭两个服务，独立守护也无法继续恢复。
+- 默认独立 guardian：即使主容器停止，仍可在心跳超过约 30 秒后恢复限速；恢复失败保留队列重试。
+- 非 Docker 开发仍可使用内置恢复；整个进程停止时无法运行，仅在重启后对账。
+- 网络中断、下载器或整台主机也关机、守护同时停止：无法远程修改下载器，待重新可达后继续恢复。若同时关闭两个服务，独立守护也无法继续恢复。
 - 用户在下载器手动改了被接管种子的限速：退出接管、记录外部修改，避免覆盖。
 - 页面“恢复系统限速”会关闭带宽池并解除系统限速，不是清空所有下载器限速。
 
@@ -60,6 +60,10 @@ docker exec torrent-flow cat /data/initial-password.txt
 种子以“下载器实例 ID＋infohash”标识，累计计数器差分计量，不用速率乘时间。多个 Tracker 的种子只有一份统计；跨实例相同 hash 的两次传输分别计量。多个不同站点命中时显示冲突，等待指定主归属。
 
 删除种子不删除历史流量。计数器回退或重新添加建立新基线；不能还原客户端已经丢失的计数。长时间离线后能补记累计增量，但无法精确还原每个字节的时间，相关报表明确标注不确定区间。更改站点规则不重写既有历史，之后增量采用新的归属。
+
+## 总上传 1M 怎么配置
+
+参见 [1 MiB/s 总预算配置说明](docs/UPLOAD-1M.md)，含两个下载器、两个站点、3:1 权重、最低额度和启用步骤。1 Mbps 上行与 1 MiB/s 不是同一单位。
 
 ## 占用与采集优化
 
@@ -72,7 +76,7 @@ docker exec torrent-flow cat /data/initial-password.txt
 
 SQLite 数据库和 `master.key` 必须一起保留，连接配置通过 AES-GCM 加密保存。登录使用密码哈希、HttpOnly/SameSite Cookie、CSRF 令牌、登录频率限制。应用只供部署者个人使用，没有公开注册。
 
-管理员主动配置的内网下载器需要服务端发起请求；此功能允许访问内网，不能把后台账号交给不可信用户。HTTP 重定向关闭，不会将凭据转发到另一主机。建议内网使用或通过 HTTPS 反代，并设置 `COOKIE_SECURE=true`。
+管理员主动配置的内网下载器需要服务端发起请求；此功能允许访问内网，不能把后台账号交给不可信用户。普通请求不跟随跳转；TR RPC 仅允许有限次数同源跳转（或同主机安全升级到 HTTPS），不会将凭据转发到另一主机或任意端口。建议内网使用或通过 HTTPS 反代，并设置 `COOKIE_SECURE=true`。
 
 备份前先通过界面关闭调速并确认恢复队列为空，再停止服务，复制完整 `data/` 目录。在其他位置挂载该完整目录即可恢复；不要只复制正在写入的 SQLite 主文件。不要公开分享数据库、密钥、初始密码或连接设置。删除 `master.key` 不能重置密码，只会让连接密文无法解密。
 
@@ -98,4 +102,4 @@ MIT。功能调研参考 [torrent-traffic-monitor](https://github.com/ystykxc/to
 
 ---
 
-**English:** Personal, self-hosted traffic accounting and upload-budget control for multiple qBittorrent / Transmission instances. Counters are measured per torrent, not per tracker; site aliases are grouped without duplicate accounting. Start the Compose stack, read the generated initial password locally, connect downloaders, configure site rules and optionally enable guarded bandwidth allocation. Only opted-in torrents are controlled. The default deployment uses one container with embedded recovery and restart reconciliation. An external guardian is optional for recovery while the controller container is stopped. No recovery can run while the responsible worker or downloader is unreachable. Keep the entire data directory, including the encryption key, when migrating.
+**English:** Personal, self-hosted traffic accounting and upload-budget control for multiple qBittorrent / Transmission instances. Counters are measured per torrent, not per tracker; site aliases are grouped without duplicate accounting. Start the Compose stack, read the generated initial password locally, connect downloaders, configure site rules and optionally enable guarded bandwidth allocation. Only opted-in torrents are controlled. The default deployment uses a main container and an independent guardian so recovery can continue while the main container is stopped. No recovery can run while the responsible worker or downloader is unreachable. Keep the entire data directory, including the encryption key, when migrating.
