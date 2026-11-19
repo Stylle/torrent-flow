@@ -170,7 +170,7 @@ func (s *Store) ingest(client string, items []Torrent, now time.Time, poll int) 
 		return e
 	}
 	defer tx.Rollback()
-	rows, e := tx.Query("SELECT k,up,down,at,added,present FROM baseline WHERE k LIKE ? ESCAPE '\\'", strings.NewReplacer("\\", "\\\\", "_", "\\_", "%", "\\%").Replace(client)+":%")
+	rows, e := tx.Query("SELECT k,up,down,at,added,present FROM baseline WHERE k>=? AND k<?", client+":", client+";")
 	if e != nil {
 		return e
 	}
@@ -186,7 +186,7 @@ func (s *Store) ingest(client string, items []Torrent, now time.Time, poll int) 
 		old[k] = v
 	}
 	rows.Close()
-	tx.Exec("UPDATE baseline SET present=0 WHERE k LIKE ?", client+":%")
+	tx.Exec("UPDATE baseline SET present=0 WHERE k>=? AND k<?", client+":", client+";")
 	for _, t := range items {
 		if p, ok := old[t.Key]; ok && p.present && (p.added == t.Added || p.added == 0 || t.Added == 0) {
 			if t.Uploaded >= p.up && t.Downloaded >= p.down {

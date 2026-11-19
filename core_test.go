@@ -75,6 +75,26 @@ func TestDomainAndRegex(t *testing.T) {
 		t.Fatal("override ignored")
 	}
 }
+
+func TestClientCounterNamespaceIsolation(t *testing.T) {
+	s := testStore(t)
+	now := time.Now()
+	a := Torrent{Key: "first_one:abc", Uploaded: 100}
+	b := Torrent{Key: "firstXone:abc", Uploaded: 100}
+	if e := s.ingest("first_one", []Torrent{a}, now, 5); e != nil {
+		t.Fatal(e)
+	}
+	if e := s.ingest("firstXone", []Torrent{b}, now, 5); e != nil {
+		t.Fatal(e)
+	}
+	s.ingest("first_one", nil, now.Add(time.Second), 5)
+	b.Uploaded = 130
+	s.ingest("firstXone", []Torrent{b}, now.Add(5*time.Second), 5)
+	out, e := s.report(now.Add(-time.Second), now.Add(time.Minute))
+	if e != nil || len(out) != 1 || out[0].Up != 30 {
+		t.Fatal("downloader namespaces interfered with cumulative baselines")
+	}
+}
 func TestLedgerLifecycle(t *testing.T) {
 	s := testStore(t)
 	at := time.Date(2026, 11, 19, 1, 0, 0, 0, time.UTC)
