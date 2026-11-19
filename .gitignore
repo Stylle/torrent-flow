@@ -1,0 +1,11 @@
+data/
+*.db*
+*.sqlite*
+*.exe
+.env
+frontend/node_modules/
+frontend/dist/
+coverage*
+*.log
+dist/
+.DS_Store

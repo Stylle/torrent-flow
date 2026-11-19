@@ -1,0 +1,10 @@
+.git
+.env
+data
+dist
+*.exe
+*.log
+frontend/node_modules
+frontend/dist
+frontend/.git
+frontend/.gitignore

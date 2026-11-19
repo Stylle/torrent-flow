@@ -1,0 +1,22 @@
+services:
+  torrent-flow:
+    image: stylle/torrent-flow:latest
+    container_name: torrent-flow
+    restart: unless-stopped
+    ports:
+      - "28188:8080"
+    volumes:
+      - ./data:/data
+    stop_grace_period: 45s
+  guardian:
+    image: stylle/torrent-flow:latest
+    container_name: torrent-flow-guardian
+    restart: unless-stopped
+    command: ["--guardian"]
+    volumes:
+      - ./data:/data
+    healthcheck:
+      test: ["CMD", "/app/flow", "--guardian-health"]
+      interval: 15s
+      timeout: 10s
+      start_period: 20s
