@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.4
+
+- Discover Tracker hostnames automatically, preserve renamed sites and existing manual rules, and keep passkeys out of site settings and UI.
+- Show only actively controlled torrents with upload connections in the overview; display Tracker hostnames and retain full configuration lists.
+- Add explicit downloader-wide automatic active-torrent control with individual exclusions and unchanged recovery ownership.
+- Provide recommended defaults and explain weights, minimums, caps, targets, sampling and idle release in settings.
+- Preselect a sole bandwidth pool, associate unassigned downloaders when creating the first pool, and keep the editable example budget disabled until confirmed.
+
 ## 0.1.3
 
 - Keep form dialogs open when their backdrop is clicked; preserve explicit close/cancel and keyboard dismissal.

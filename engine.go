@@ -88,6 +88,14 @@ func (e *Engine) tick(ctx context.Context) {
 			continue
 		}
 		status.Online = true
+		if next, added := discoverSites(c, items); added > 0 {
+			next.Revision++
+			if next.validate() == nil && e.s.saveConfig(next) == nil {
+				c = next
+			} else {
+				warnings = append(warnings, "Tracker discovery could not be saved; existing rules retained")
+			}
+		}
 		for i := range items {
 			items[i].Site, items[i].Ambiguous = siteFor(items[i], c)
 			items[i].State = "monitoring"
@@ -149,8 +157,7 @@ func (e *Engine) tick(ctx context.Context) {
 					break
 				}
 			}
-			o := c.Overrides[t.Key]
-			if cl.Pool != pool.ID || !o.Manage || t.Site == "" || e.suspended[t.Key] {
+			if cl.Pool != pool.ID || !c.manages(t) || t.Site == "" || e.suspended[t.Key] {
 				continue
 			}
 			if t.Connections > 0 {

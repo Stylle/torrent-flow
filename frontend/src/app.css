@@ -1173,3 +1173,26 @@ td {
     padding: 16px;
   }
 }
+
+.tracker-hosts {
+  overflow-wrap: anywhere;
+  max-width: 36rem;
+}
+
+.advanced-fields {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.advanced-fields summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 13px;
+}
+.advanced-fields[open] summary {
+  margin-bottom: 14px;
+}
+
+.badge.state {
+  white-space: nowrap;
+}

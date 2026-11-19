@@ -59,7 +59,7 @@ function demoData() {
       afterTarget: MB,
     }));
   return {
-    version: "0.1.3",
+    version: "0.1.4",
     config: {
       revision: 0,
       timezone: "Asia/Shanghai",
@@ -111,6 +111,11 @@ function demoData() {
       (name, i) => ({
         key: "qb:" + i,
         name,
+        hosts: [
+          ["tracker.north.example"],
+          ["tracker.bay.example"],
+          ["tracker.mountain.example"],
+        ][i],
         site: "s" + i,
         connections: [3, 2, 0][i],
         limit: [8, 6, 0][i] * MB,
@@ -289,8 +294,8 @@ export function App() {
   }, [modal, busy]);
   useEffect(() => {
     const mobile = matchMedia("(max-width: 1000px)");
-    const resize = () => {
-      if (!mobile.matches) setMenu(false);
+    const resize = (event) => {
+      if (!event.matches) setMenu(false);
     };
     const key = (e) => {
       if (e.key === "Escape") setMenu(false);
@@ -409,11 +414,11 @@ export function App() {
     open("site", {
       ...s,
       domainText: s.domains.join("\n"),
-      minimum: s.minimum / MB,
-      maximum: s.maximum / MB,
-      afterTarget: s.afterTarget / MB,
-      dayTarget: s.dayTarget / GB,
-      monthTarget: s.monthTarget / GB,
+      minimum: Number((s.minimum / MB).toFixed(3)),
+      maximum: Number((s.maximum / MB).toFixed(3)),
+      afterTarget: Number((s.afterTarget / MB).toFixed(3)),
+      dayTarget: Number((s.dayTarget / GB).toFixed(3)),
+      monthTarget: Number((s.monthTarget / GB).toFixed(3)),
     });
   }
   function newSite() {
@@ -422,12 +427,12 @@ export function App() {
       name: "",
       domains: [],
       regex: "",
-      weight: 3,
+      weight: 1,
       minimum: 0,
       maximum: 0,
       dayTarget: 0,
       monthTarget: 0,
-      afterTarget: MB,
+      afterTarget: Math.round(0.05 * MB),
     });
   }
   function newClient() {
@@ -438,7 +443,8 @@ export function App() {
       url: "",
       user: "",
       password: "",
-      pool: "",
+      pool: c.pools.length === 1 ? c.pools[0].id : "",
+      autoManage: false,
       enabled: true,
     });
   }
@@ -519,7 +525,13 @@ export function App() {
           v[k] = Math.round(Number(v[k] || 0) * GB);
         v.weight = Number(v.weight);
       }
-      if (modal === "pool") v.budget = Math.round(Number(v.budget) * MB);
+      if (modal === "pool") {
+        v.budget = Math.round(Number(v.budget) * MB);
+        if (!next.pools.length)
+          next.clients = next.clients.map((cl) =>
+            cl.pool ? cl : { ...cl, pool: v.id },
+          );
+      }
       const i = next[field].findIndex((x) => x.id === v.id);
       if (i < 0) next[field].push(v);
       else next[field][i] = v;
@@ -704,8 +716,8 @@ export function App() {
         <div className="empty">
           <Globe size={30} />
           {t(
-            "添加站点规则，自动归类域名",
-            "Add site rules to classify tracker domains",
+            "连接下载器后自动发现 Tracker，点击站点修改名称",
+            "Tracker sites appear automatically after connecting a downloader. Click a site to rename it.",
           )}
           <br />
           <button onClick={newSite}>
@@ -773,6 +785,16 @@ export function App() {
       monitoring: t("监控中", "Monitoring"),
       "release pending": t("恢复待重试", "Recovery pending"),
     })[v] || v;
+  const visibleTorrents = (data?.torrents || []).filter(
+    (x) =>
+      (page !== 1 ||
+        !search ||
+        x.name.toLowerCase().includes(search.toLowerCase()) ||
+        (x.hosts || []).some((h) =>
+          h.toLowerCase().includes(search.toLowerCase()),
+        )) &&
+      (page !== 0 || (x.managed && x.connections > 0)),
+  );
   const torrents = (
     <div className="table-wrap">
       <table>
@@ -786,57 +808,65 @@ export function App() {
           </tr>
         </thead>
         <tbody>
-          {data?.torrents
-            .filter(
-              (x) =>
-                !search || x.name.toLowerCase().includes(search.toLowerCase()),
-            )
-            .map((x) => (
-              <tr
-                key={x.key}
-                className="action-row"
-                onClick={() =>
-                  open("torrent", {
-                    key: x.key,
-                    name: x.name,
-                    site: x.site,
-                    weight: c.overrides[x.key]?.weight || 1,
-                    manage: c.overrides[x.key]?.manage || false,
-                  })
-                }
-              >
-                <td className="name">
-                  <span className="torrent-name">{x.name}</span>
-                  {x.ambiguous && (
-                    <small>
-                      {t(
-                        "多个站点冲突，请指定归属",
-                        "Multiple sites; select an owner",
-                      )}
-                    </small>
-                  )}
-                </td>
-                <td className="hide-phone">{siteName(x.site)}</td>
-                <td>{x.connections}</td>
-                <td>
-                  {x.limit ? bytes(x.limit, true) : t("不限速", "Unlimited")}
-                </td>
-                <td>
-                  <span
-                    className={"badge state " + (!x.managed ? "neutral" : "")}
-                  >
-                    {stateLabel(x.state)}
-                  </span>
-                </td>
-              </tr>
-            ))}
+          {visibleTorrents.map((x) => (
+            <tr
+              key={x.key}
+              className="action-row"
+              onClick={() =>
+                open("torrent", {
+                  key: x.key,
+                  name: x.name,
+                  site: x.site,
+                  weight: c.overrides[x.key]?.weight || 1,
+                  manage:
+                    c.overrides[x.key]?.manage ??
+                    !!c.clients.find((cl) => cl.id === x.client)?.autoManage,
+                })
+              }
+            >
+              <td className="name">
+                <span className="torrent-name">{x.name}</span>
+                <small
+                  className="tracker-hosts"
+                  title={(x.hosts || []).join(" · ")}
+                >
+                  Tracker ·{" "}
+                  {(x.hosts || []).join(" · ") || t("未提供", "Not available")}
+                </small>
+                {x.ambiguous && (
+                  <small>
+                    {t(
+                      "多个站点冲突，请指定归属",
+                      "Multiple sites; select an owner",
+                    )}
+                  </small>
+                )}
+              </td>
+              <td className="hide-phone">{siteName(x.site)}</td>
+              <td>{x.connections}</td>
+              <td>
+                {x.limit ? bytes(x.limit, true) : t("不限速", "Unlimited")}
+              </td>
+              <td>
+                <span
+                  className={"badge state " + (!x.managed ? "neutral" : "")}
+                >
+                  {stateLabel(x.state)}
+                </span>
+              </td>
+            </tr>
+          ))}
         </tbody>
       </table>
-      {!data?.torrents.length && (
+      {!visibleTorrents.length && (
         <div className="empty">
           {t(
-            "尚未发现种子，连接下载器后自动采集",
-            "No torrents yet. Connect a downloader to begin.",
+            page === 0
+              ? "暂无正在接管且有上传连接的种子"
+              : "没有匹配的种子，连接下载器后自动采集",
+            page === 0
+              ? "No controlled torrents with active upload connections"
+              : "No matching torrents. Connect a downloader to begin.",
           )}
         </div>
       )}
@@ -1200,8 +1230,8 @@ export function App() {
               <p className="hint">
                 <Info size={15} />
                 {t(
-                  "多 Tracker 种子仅统计一次；仅接管你启用的种子，无连接后自动恢复不限速。",
-                  "Each torrent is counted once. Only opted-in torrents are controlled; inactive torrents return to unlimited.",
+                  "仅显示正在接管且有上传连接的种子。完整列表在站点统计和带宽策略中查看。",
+                  "Only controlled torrents with upload connections appear here. Find all torrents in Sites or Bandwidth policies.",
                 )}
               </p>
             </section>
@@ -1234,8 +1264,8 @@ export function App() {
               <p className="hint">
                 <Info size={15} />
                 {t(
-                  "域名匹配忽略 passkey；多个域名可归入一个站点。点击站点编辑。",
-                  "Domain rules ignore passkeys. Multiple domains may share a site. Click a site to edit.",
+                  "Tracker 按域名自动归类，忽略 passkey。点击站点修改名称；可将多个域名放在同一站点。",
+                  "Trackers are discovered by hostname, ignoring passkeys. Click a site to rename it or group multiple domains.",
                 )}
               </p>
             </section>
@@ -1267,8 +1297,8 @@ export function App() {
                 onClick={() =>
                   open("pool", {
                     id: id(),
-                    name: "",
-                    budget: 10,
+                    name: t("主出口", "Main uplink"),
+                    budget: 1,
                     enabled: false,
                   })
                 }
@@ -1557,6 +1587,17 @@ export function App() {
                       ...c.pools.map((p) => [p.id, p.name]),
                     ])}
                     {toggle("enabled", "启用采集", "Enable monitoring")}
+                    {toggle(
+                      "autoManage",
+                      "自动接管活跃种子",
+                      "Automatically manage active torrents",
+                    )}
+                    <small>
+                      {t(
+                        "默认关闭。开启一次后，此下载器的新旧活跃种子自动参与所在带宽池分配，无需逐个勾选；无连接后释放。仍需先设置并开启带宽池，单个种子可另行排除。",
+                        "Off by default. Once enabled, existing and new active torrents join their uplink pool automatically; idle limits are released. Enable a configured pool first. Individual torrents can be excluded.",
+                      )}
+                    </small>
                   </>
                 )}
                 {modal === "site" && (
@@ -1564,25 +1605,45 @@ export function App() {
                     {field("name", "站点名称", "Site name", "text", {
                       required: true,
                     })}
-                    <label>
-                      {t("匹配域名（每行一个）", "Domains (one per line)")}
-                      <textarea
-                        value={form.domainText}
-                        placeholder={"a.example\nb.example"}
-                        onChange={(e) =>
-                          setForm({ ...form, domainText: e.target.value })
-                        }
-                      />
-                    </label>
-                    {field(
-                      "regex",
-                      "正则匹配（可选，RE2）",
-                      "Regex (optional, RE2)",
-                    )}
                     <small>
                       {t(
-                        "域名规则忽略路径和 passkey；正则匹配完整 Tracker URL。",
-                        "Domains ignore paths/passkeys; regex matches the complete tracker URL.",
+                        "域名已从 Tracker 自动识别，通常只需修改名称。新站点默认权重 1、无最低保留、无额外封顶、关闭流量目标。",
+                        "Tracker domains are discovered automatically; usually just rename the site. New sites use weight 1, no reserved minimum, no extra cap and disabled traffic targets.",
+                      )}
+                    </small>
+                    <details className="advanced-fields" open={!form.automatic}>
+                      <summary>
+                        {t(
+                          "高级匹配（通常无需修改）",
+                          "Advanced matching (usually unchanged)",
+                        )}
+                      </summary>
+                      <label>
+                        {t("匹配域名（每行一个）", "Domains (one per line)")}
+                        <textarea
+                          value={form.domainText}
+                          placeholder={"a.example\nb.example"}
+                          onChange={(e) =>
+                            setForm({ ...form, domainText: e.target.value })
+                          }
+                        />
+                      </label>
+                      {field(
+                        "regex",
+                        "正则匹配（可选，RE2）",
+                        "Regex (optional, RE2)",
+                      )}
+                      <small>
+                        {t(
+                          "域名规则忽略路径和 passkey；正则匹配完整 Tracker URL。",
+                          "Domains ignore paths/passkeys; regex matches the complete tracker URL.",
+                        )}
+                      </small>
+                    </details>
+                    <small>
+                      {t(
+                        "推荐权重 1 表示同等分配；改为 3 可获得约三倍的剩余额度。最低额度 0 不预留带宽，空闲站点不占额度。",
+                        "Recommended weight 1 shares equally; weight 3 receives roughly three times the spare allowance. Minimum 0 reserves no bandwidth; idle sites consume none.",
                       )}
                     </small>
                     <div className="field-pair">
@@ -1598,7 +1659,7 @@ export function App() {
                         "最低额度 MiB/s",
                         "Minimum MiB/s",
                         "number",
-                        { min: 0, step: 0.01 },
+                        { min: 0, step: 0.001 },
                       )}
                     </div>
                     {field(
@@ -1606,22 +1667,28 @@ export function App() {
                       "最高额度 MiB/s（0 无上限）",
                       "Maximum MiB/s (0 = uncapped)",
                       "number",
-                      { min: 0, step: 0.01 },
+                      { min: 0, step: 0.001 },
                     )}
+                    <small>
+                      {t(
+                        "最高额度 0 表示只受带宽池约束；日/月目标 0 表示关闭，建议先保持默认。启用目标后，达标仍保留默认 0.05 MiB/s 低速额度，不暂停种子。",
+                        "Maximum 0 uses only the pool limit. Daily/monthly target 0 disables targets; keep these defaults initially. Enabled targets switch to a 0.05 MiB/s allowance after reaching the target, without pausing torrents.",
+                      )}
+                    </small>
                     <div className="field-pair">
                       {field(
                         "dayTarget",
                         "日目标 GiB（0 关闭）",
                         "Daily target GiB (0 = off)",
                         "number",
-                        { min: 0, step: 0.1 },
+                        { min: 0, step: 0.001 },
                       )}
                       {field(
                         "monthTarget",
                         "月目标 GiB（0 关闭）",
                         "Monthly target GiB (0 = off)",
                         "number",
-                        { min: 0, step: 0.1 },
+                        { min: 0, step: 0.001 },
                       )}
                     </div>
                     {field(
@@ -1650,8 +1717,8 @@ export function App() {
                     )}
                     <small>
                       {t(
-                        "保存后给下载器选择此带宽池，并为种子开启接管。",
-                        "Assign downloaders to this pool, then opt torrents into control.",
+                        "首个带宽池会自动关联未分组下载器；不同出口请另建带宽池。默认 1 MiB/s 是示例，不是实测网速。下载器开启自动接管后无需逐个设置。",
+                        "The first pool automatically includes unassigned downloaders. Budget 1 MiB/s is an editable example, not a measured uplink speed. Enable downloader automatic management to avoid per-torrent setup.",
                       )}
                     </small>
                   </>
@@ -1704,6 +1771,12 @@ export function App() {
                       "number",
                       { min: 5, max: 60 },
                     )}
+                    <small>
+                      {t(
+                        "推荐 5 秒：及时更新流量与带宽分配；种子特别多时可改为 10–15 秒，减少下载器 API 请求。",
+                        "Recommended 5 seconds keeps traffic and allocation current. Use 10–15 seconds for large libraries to reduce API requests.",
+                      )}
+                    </small>
                     {field(
                       "idleSeconds",
                       "无连接释放延迟，秒（10–300）",
@@ -1711,6 +1784,12 @@ export function App() {
                       "number",
                       { min: 10, max: 300 },
                     )}
+                    <small>
+                      {t(
+                        "推荐 15 秒：连接短暂抖动时避免反复调速；持续无连接后恢复系统施加的种子限速。",
+                        "Recommended 15 seconds avoids limit churn on brief disconnects; sustained inactivity releases system-owned limits.",
+                      )}
+                    </small>
                   </>
                 )}
                 {modal === "password" && (

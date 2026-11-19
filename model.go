@@ -10,19 +10,21 @@ import (
 	"time"
 )
 
-const Version = "0.1.3"
+const Version = "0.1.4"
 
 type Client struct {
-	ID       string `json:"id"`
-	Name     string `json:"name"`
-	Kind     string `json:"kind"`
-	URL      string `json:"url"`
-	User     string `json:"user"`
-	Password string `json:"password,omitempty"`
-	Pool     string `json:"pool"`
-	Enabled  bool   `json:"enabled"`
+	AutoManage bool   `json:"autoManage,omitempty"`
+	ID         string `json:"id"`
+	Name       string `json:"name"`
+	Kind       string `json:"kind"`
+	URL        string `json:"url"`
+	User       string `json:"user"`
+	Password   string `json:"password,omitempty"`
+	Pool       string `json:"pool"`
+	Enabled    bool   `json:"enabled"`
 }
 type Site struct {
+	Automatic   bool     `json:"automatic,omitempty"`
 	ID          string   `json:"id"`
 	Name        string   `json:"name"`
 	Domains     []string `json:"domains"`
@@ -115,6 +117,7 @@ func siteFor(t Torrent, c Config) (string, bool) {
 		return o.Site, false
 	}
 	found := map[string]bool{}
+	first := ""
 	for _, s := range c.Sites {
 		for _, v := range t.Trackers {
 			h := host(v)
@@ -122,12 +125,18 @@ func siteFor(t Torrent, c Config) (string, bool) {
 				d = strings.ToLower(strings.TrimSpace(d))
 				if h != "" && (h == d || strings.HasSuffix(h, "."+d)) {
 					found[s.ID] = true
+					if first == "" {
+						first = s.ID
+					}
 				}
 			}
 			if s.Regex != "" {
 				re, e := regexp.Compile(s.Regex)
 				if e == nil && re.MatchString(v) {
 					found[s.ID] = true
+					if first == "" {
+						first = s.ID
+					}
 				}
 			}
 		}
@@ -137,8 +146,48 @@ func siteFor(t Torrent, c Config) (string, bool) {
 			return k, false
 		}
 	}
-	return "", len(found) > 1
+	if len(found) > 1 {
+		manual := ""
+		for _, s := range c.Sites {
+			if found[s.ID] && !s.Automatic {
+				if manual != "" {
+					return "", true
+				}
+				manual = s.ID
+			}
+		}
+		if manual != "" {
+			return manual, false
+		}
+		// Preserve downloader tracker order when all matches are automatic.
+		for _, raw := range t.Trackers {
+			h := host(raw)
+			for _, s := range c.Sites {
+				for _, d := range s.Domains {
+					if found[s.ID] && (h == strings.ToLower(strings.TrimSpace(d)) || strings.HasSuffix(h, "."+strings.ToLower(strings.TrimSpace(d)))) {
+						return s.ID, false
+					}
+				}
+			}
+		}
+		return first, false
+	}
+	return "", false
 }
+
+// Per-torrent explicit choices override downloader-wide opt-in, including exclusions.
+func (c Config) manages(t Torrent) bool {
+	if o, ok := c.Overrides[t.Key]; ok {
+		return o.Manage
+	}
+	for _, cl := range c.Clients {
+		if cl.ID == t.Client {
+			return cl.AutoManage
+		}
+	}
+	return false
+}
+
 func (c Config) validate() error {
 	if len(c.Clients) > 32 || len(c.Sites) > 256 || len(c.Pools) > 32 || len(c.Overrides) > 50000 {
 		return fmt.Errorf("configuration exceeds supported limits")

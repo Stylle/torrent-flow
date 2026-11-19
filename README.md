@@ -35,10 +35,12 @@ docker exec torrent-flow cat /data/initial-password.txt
 ## 使用顺序
 
 1. 下载器 → 添加 qBittorrent 或 Transmission，先测试连接再保存。默认只读采集，不更改下载器。
-2. 站点统计 → 添加站点名称、匹配域名（支持多个）及可选 RE2 正则。同站点域名自动合并；域名不依赖 passkey。正则针对完整 Tracker URL，但不会在界面、日志中回显 passkey。
+2. 站点统计 → 自动从下载器发现 Tracker 域名，不用先录入规则；点击站点修改名称。同域名不同路径/passkey 自动归为同一站点。高级场景仍可设置多个域名别名和 RE2 正则，界面不会显示 passkey。
 3. 观察统计。首次接入的旧累计值建立基线，不记为今日新增。日/周/月/年按所选时区汇总，保留最近一年。
 4. 需要自动调速时，先添加带宽池，给同一出口的下载器选择该池。设置站点权重、最低额度、最高额度，确认守护在线后开启带宽池。
-5. 点击种子，选择唯一站点归属并明确开启接管。每个种子只有一个限速，不会因为多个 Tracker 重复计量或同时应用多个策略。
+5. 下载器设置 → 开启“自动接管活跃种子”，此下载器已有和未来的活跃种子自动参与带宽池分配，无需逐个勾选；默认关闭，开启之前不会写入限速。单个种子可以明确排除，也可保持原来的逐个接管方式。每个种子只有一个限速，不会因为多个 Tracker 重复计量。
+
+总览的“动态带宽分配”仅显示正在接管且有上传连接的种子，种子名称下显示去除敏感路径的 Tracker 域名。完整列表在站点统计、带宽策略中查看；可搜索种子名称或 Tracker 域名。首个带宽池默认关联尚未分组的下载器；新增下载器在只有一个池时默认选中该池，不同出口需手动另建池。
 
 有上传连接的种子参与动态分配。最低额度后按权重分配剩余额度；无连接持续超过释放延迟后恢复种子不限速。实际速度受其他 peer 需求影响，额度不代表实际速度。qBittorrent 使用连接的 leechers 判断需求；Transmission 使用正在接收/感兴趣的 peer，按客户端公开字段作近似判断，不保证严格的网络层公平排队。
 
@@ -57,9 +59,26 @@ docker exec torrent-flow cat /data/initial-password.txt
 
 ## 统计口径
 
-种子以“下载器实例 ID＋infohash”标识，累计计数器差分计量，不用速率乘时间。多个 Tracker 的种子只有一份统计；跨实例相同 hash 的两次传输分别计量。多个不同站点命中时显示冲突，等待指定主归属。
+种子以“下载器实例 ID＋infohash”标识，累计计数器差分计量，不用速率乘时间。多个 Tracker 的种子只有一份统计；跨实例相同 hash 的两次传输分别计量。自动发现的多 Tracker 种子默认按下载器返回的第一个 Tracker 归属；明确指定的单种子归属优先，唯一的手动站点规则优先于自动规则。多个手动站点规则互相冲突时仍需明确选择归属，避免静默更改已配置的统计口径。
 
 删除种子不删除历史流量。计数器回退或重新添加建立新基线；不能还原客户端已经丢失的计数。长时间离线后能补记累计增量，但无法精确还原每个字节的时间，相关报表明确标注不确定区间。更改站点规则不重写既有历史，之后增量采用新的归属。
+
+## 推荐默认参数
+
+| 参数 | 默认 / 推荐 | 作用 |
+|---|---|---|
+| 站点识别 | 自动 | 按 Tracker 主机名归类，忽略路径/passkey；名称可修改 |
+| 站点权重 | 1 | 活跃站点平分剩余额度；3 对 1 为约三倍的剩余额度 |
+| 最低额度 | 0 | 不提前保留带宽，避免空闲站点或大量站点占满最低额度 |
+| 最高额度 | 0 | 不额外封顶，仍受总带宽池预算约束 |
+| 日 / 月上传目标 | 0 | 默认关闭；需要达标降速时再开启 |
+| 达标后额度 | 0.05 MiB/s | 开启目标后生效，保持非零上传，不暂停种子 |
+| 采样间隔 | 5 秒 | 及时统计和调度；大量种子可用 10–15 秒降低 API 负载 |
+| 无连接释放延迟 | 15 秒 | 避免连接抖动造成频繁写限速，持续闲置后释放 |
+| 新带宽池预算 | 1 MiB/s，默认关闭 | 可编辑示例，必须按真实出口带宽确认，系统无法自动测准 |
+| 下载器自动接管 | 默认关闭，确认预算后开启一次 | 已有/新出现的活跃种子自动参与，单种子排除优先 |
+
+原有手动规则、权重和接管选择保持不变，不会自动重置成推荐值。没有 Tracker 的种子仍标记未分类。
 
 ## 总上传 1M 怎么配置
 
@@ -102,4 +121,4 @@ MIT。功能调研参考 [torrent-traffic-monitor](https://github.com/ystykxc/to
 
 ---
 
-**English:** Personal, self-hosted traffic accounting and upload-budget control for multiple qBittorrent / Transmission instances. Counters are measured per torrent, not per tracker; site aliases are grouped without duplicate accounting. Start the Compose stack, read the generated initial password locally, connect downloaders, configure site rules and optionally enable guarded bandwidth allocation. Only opted-in torrents are controlled. The default deployment uses a main container and an independent guardian so recovery can continue while the main container is stopped. No recovery can run while the responsible worker or downloader is unreachable. Keep the entire data directory, including the encryption key, when migrating.
+**English:** Personal, self-hosted traffic accounting and upload-budget control for multiple qBittorrent / Transmission instances. Counters are measured per torrent, not per tracker; site aliases are grouped without duplicate accounting. Start the Compose stack, read the generated initial password locally, connect downloaders, configure site rules and optionally enable guarded bandwidth allocation. Control requires per-torrent opt-in or one explicit downloader-wide automatic opt-in; individual exclusions take precedence. The default deployment uses a main container and an independent guardian so recovery can continue while the main container is stopped. No recovery can run while the responsible worker or downloader is unreachable. Keep the entire data directory, including the encryption key, when migrating.
