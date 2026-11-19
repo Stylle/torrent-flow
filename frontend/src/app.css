@@ -1254,3 +1254,111 @@ td {
 .period-selector select {
   max-width: 100%;
 }
+
+.plot-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.chart-legend {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  max-height: 100px;
+  overflow: auto;
+  margin-top: 12px;
+}
+.chart-legend button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+}
+.chart-legend i {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+.chart-legend .muted {
+  opacity: 0.45;
+  text-decoration: line-through;
+}
+.torrent-table {
+  width: 100%;
+  table-layout: fixed;
+}
+.torrent-table th {
+  position: relative;
+  padding-right: 16px;
+  white-space: nowrap;
+}
+.torrent-table td {
+  padding: 10px 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.torrent-table td.name {
+  min-width: 0;
+  white-space: nowrap;
+}
+.torrent-table .torrent-name {
+  max-width: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.column-handle {
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 12px;
+  height: 100%;
+  cursor: col-resize;
+  touch-action: none;
+  user-select: none;
+  border-right: 2px solid var(--line);
+}
+.column-handle:hover,
+.column-handle:focus-visible {
+  border-color: var(--teal);
+  background: var(--soft);
+}
+.language-toggle {
+  font-size: 12px;
+  font-weight: 600;
+}
+.about-policy h3 {
+  margin-top: 22px;
+}
+.about-policy p {
+  line-height: 1.85;
+}
+
+.allocation-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 22px;
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.allocation-summary strong {
+  margin-left: 5px;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.plot-controls select {
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 7px 10px;
+  min-height: 34px;
+  font: inherit;
+  font-size: 12px;
+}

@@ -165,9 +165,19 @@ func (sv *Server) backup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer tx.Rollback()
-	for _, table := range []string{"baseline", "traffic", "speeds", "control_blocks", "events", "notification_jobs"} {
+	for _, table := range []string{"baseline", "traffic", "speeds", "site_speeds", "control_blocks", "events", "notification_jobs"} {
 		if _, err = tx.Exec("DELETE FROM " + table); err != nil {
 			break
+		}
+		if table == "site_speeds" {
+			var present int
+			if tx.QueryRow("SELECT COUNT(*) FROM imported.sqlite_master WHERE type='table' AND name='site_speeds'").Scan(&present) != nil {
+				err = fmt.Errorf("cannot inspect chart history")
+				break
+			}
+			if present == 0 {
+				continue
+			}
 		}
 		if _, err = tx.Exec("INSERT INTO " + table + " SELECT * FROM imported." + table); err != nil {
 			break
@@ -197,6 +207,7 @@ func (sv *Server) backup(w http.ResponseWriter, r *http.Request) {
 		failHTTP(w, 500, "restore failed")
 		return
 	}
+	sv.speedEpoch.Add(1)
 	sv.e.started = false
 	sv.e.adapters = map[string]*Adapter{}
 	sv.e.idle = map[string]time.Time{}

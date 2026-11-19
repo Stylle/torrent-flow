@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.6
+
+- Place Webhook and backup above settings, unify Chinese menu labels, and add an About page explaining allocation, history and recovery.
+- Replace the two language choices with one language button.
+- Record per-site upload/download rate history for24h; offer5/15/30m and1/3/6/12/24h windows with bounded aggregation and caching.
+- Draw separate site lines and site-colored stacked traffic bars with byte totals and percentage tooltips; colors agree across charts and site tables.
+- Compact torrent rows into separate name/rate/limit/state/downloader/site/connection/Tracker columns; drag or keyboard-resize columns, keeping widths only on the device.
+- Add active upload/allowance summaries and remove duplicate per-torrent ownership from the outlet page.
+- Include per-site history in backups while still accepting0.1.5 archives without that table.
+
+
 ## 0.1.5
 
 - Independently start/stop automatic allocation for each downloader while keeping monitoring active; stopping clears torrent-level limits and persists failed clearance.

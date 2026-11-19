@@ -164,8 +164,31 @@ func (e *Engine) tick(ctx context.Context) {
 		online = online || status.Online
 	}
 	if online && now.Unix()-e.lastSpeed >= 15 {
-		e.s.db.Exec("INSERT OR REPLACE INTO speeds VALUES(?,?,?)", now.Unix(), up, down)
-		e.lastSpeed = now.Unix()
+		tx, err := e.s.db.Begin()
+		if err == nil {
+			_, err = tx.Exec("INSERT OR REPLACE INTO speeds VALUES(?,?,?)", now.Unix(), up, down)
+			totals := map[string][2]int64{}
+			for _, torrent := range all {
+				v := totals[torrent.Site]
+				v[0] += torrent.Up
+				v[1] += torrent.Down
+				totals[torrent.Site] = v
+			}
+			for site, v := range totals {
+				if err != nil {
+					break
+				}
+				_, err = tx.Exec("INSERT OR REPLACE INTO site_speeds VALUES(?,?,?,?)", now.Unix(), site, v[0], v[1])
+			}
+			if err == nil {
+				err = tx.Commit()
+			} else {
+				tx.Rollback()
+			}
+			if err == nil {
+				e.lastSpeed = now.Unix()
+			}
+		}
 	}
 	guard := heartbeat(e.s, "guardian")
 	if now.Unix()-guard > 20 {

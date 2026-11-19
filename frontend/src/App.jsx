@@ -28,6 +28,7 @@ import {
 import Chart from "chart.js/auto";
 import "./app.css";
 import { createID } from "./identity.js";
+import { buildSiteSeries, siteColor } from "./site-chart.js";
 const MB = 1048576,
   GB = 1073741824;
 const id = createID;
@@ -60,7 +61,9 @@ function demoData() {
       afterTarget: MB,
     }));
   return {
-    version: "0.1.5",
+    version: "0.1.6",
+    start: new Date(new Date().setHours(0, 0, 0, 0)).getTime() / 1000,
+    end: new Date(new Date().setHours(24, 0, 0, 0)).getTime() / 1000,
     config: {
       revision: 0,
       timezone: "Asia/Shanghai",
@@ -132,6 +135,14 @@ function demoData() {
       up: [86.2, 64.1, 36.1][i] * GB,
       down: [12.4, 18.6, 11.8][i] * GB,
     })),
+    siteSpeeds: sites.flatMap((site, i) =>
+      Array.from({ length: 60 }, (_, j) => ({
+        site: site.id,
+        time: now - (59 - j) * 30,
+        up: (3 + i + Math.sin(j / 7 + i)) * MB,
+        down: ((i + 1) * MB) / 4,
+      })),
+    ),
     speeds: Array.from({ length: 60 }, (_, i) => ({
       time: now - (59 - i) * 30,
       up: (18 + 7 * Math.sin(i / 25) + 2 * Math.sin(i / 3)) * MB,
@@ -142,33 +153,53 @@ function demoData() {
     guardian: true,
   };
 }
-function Plot({ data, bars, dark, labels }) {
+function Plot({
+  data,
+  bars = false,
+  dark,
+  sites,
+  metric = "up",
+  rangeSeconds = 1800,
+}) {
   const ref = useRef();
+  const [hidden, setHidden] = useState([]);
+  const series = useMemo(
+    () =>
+      buildSiteSeries(data, sites, {
+        bars,
+        metric,
+        sampleStep: Math.max(15, Math.floor(rangeSeconds / 480)),
+      }),
+    [data, sites, bars, metric, rangeSeconds],
+  );
   useEffect(() => {
     const css = getComputedStyle(document.documentElement),
-      colors = ["--teal", "--blue"].map((k) => css.getPropertyValue(k).trim()),
       muted = css.getPropertyValue("--muted").trim(),
       line = css.getPropertyValue("--line").trim();
     const chart = new Chart(ref.current, {
       type: bars ? "bar" : "line",
       data: {
-        labels: data.map((v) =>
-          new Date(v.time * 1000).toLocaleString(
+        labels: series.times.map((time) =>
+          new Date(time * 1000).toLocaleString(
             undefined,
-            bars
+            bars && rangeSeconds > 172800
               ? { month: "numeric", day: "numeric" }
               : { hour: "2-digit", minute: "2-digit" },
           ),
         ),
-        datasets: ["up", "down"].map((k, i) => ({
-          label: labels[i],
-          data: data.map((v) => v[k]),
-          borderColor: colors[i],
-          backgroundColor: bars ? colors[i] : colors[i] + "12",
-          borderWidth: 2,
-          pointRadius: 0,
-          tension: 0.2,
-          fill: !bars,
+        datasets: series.datasets.map((s) => ({
+          label: s.label,
+          data: bars
+            ? s.data
+            : s.data.map((value, i) => ({ x: series.times[i], y: value })),
+          borderColor: s.color,
+          backgroundColor: s.color,
+          borderWidth: bars ? 0 : 2,
+          pointRadius: series.times.length === 1 ? 3 : 0,
+          tension: 0.15,
+          fill: false,
+          spanGaps: false,
+          hidden: hidden.includes(s.id),
         })),
       },
       options: {
@@ -180,40 +211,84 @@ function Plot({ data, bars, dark, labels }) {
           legend: { display: false },
           tooltip: {
             callbacks: {
-              label: (c) => `${c.dataset.label}: ${bytes(c.raw, !bars)}`,
+              title: (items) =>
+                bars
+                  ? items[0]?.label
+                  : new Date((items[0]?.parsed.x || 0) * 1000).toLocaleString(),
+              label: (ctx) => {
+                const total = ctx.chart.data.datasets.reduce(
+                  (n, ds, i) =>
+                    n +
+                    (ctx.chart.isDatasetVisible(i)
+                      ? Number(ds.data[ctx.dataIndex] || 0)
+                      : 0),
+                  0,
+                );
+                return `${ctx.dataset.label}: ${bytes(bars ? ctx.raw : ctx.parsed.y, !bars)}${bars && total ? ` (${((Number(ctx.raw) / total) * 100).toFixed(1)}%)` : ""}`;
+              },
             },
           },
         },
         scales: {
           x: {
+            type: bars ? "category" : "linear",
+            stacked: bars,
             grid: { display: false },
-            border: { display: false },
             ticks: {
               color: muted,
-              maxTicksLimit: 7,
+              maxTicksLimit: 8,
               maxRotation: 0,
-              font: { size: 11 },
+              ...(bars
+                ? {}
+                : {
+                    callback: (value) =>
+                      new Date(Number(value) * 1000).toLocaleTimeString(
+                        undefined,
+                        { hour: "2-digit", minute: "2-digit" },
+                      ),
+                  }),
             },
           },
           y: {
+            stacked: bars,
             beginAtZero: true,
             grid: { color: line },
-            border: { display: false },
-            ticks: {
-              color: muted,
-              maxTicksLimit: 5,
-              font: { size: 11 },
-              callback: (v) => bytes(v, !bars),
-            },
+            ticks: { color: muted, callback: (v) => bytes(v, !bars) },
           },
         },
       },
     });
     return () => chart.destroy();
-  }, [data, bars, dark, labels.join()]);
+  }, [series, bars, dark, hidden, rangeSeconds]);
   return (
-    <div className="chart">
-      <canvas ref={ref} role="img" aria-label={labels.join(" / ")} />
+    <div>
+      <div className="chart">
+        <canvas
+          ref={ref}
+          role="img"
+          aria-label={series.datasets.map((s) => s.label).join(" / ")}
+          data-series={series.datasets.length}
+          data-stacked={bars}
+        />
+      </div>
+      <div className="chart-legend">
+        {series.datasets.map((s) => (
+          <button
+            key={s.id}
+            type="button"
+            aria-pressed={!hidden.includes(s.id)}
+            className={hidden.includes(s.id) ? "muted" : ""}
+            onClick={() =>
+              setHidden((v) =>
+                v.includes(s.id) ? v.filter((x) => x !== s.id) : [...v, s.id],
+              )
+            }
+          >
+            <i style={{ background: s.color }} />
+            {s.label}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
@@ -241,6 +316,30 @@ export function App() {
     [torrentPage, setTorrentPage] = useState(0),
     [menu, setMenu] = useState(false),
     [period, setPeriod] = useState("day"),
+    [speedWindow, setSpeedWindow] = useState(1800),
+    [speedMetric, setSpeedMetric] = useState("up"),
+    [trafficMetric, setTrafficMetric] = useState("up"),
+    [columnWidths, setColumnWidths] = useState(() => {
+      try {
+        const v = JSON.parse(localStorage.getItem("flow.columns.v1"));
+        if (
+          Array.isArray(v) &&
+          v.length === 8 &&
+          v.every((n) => Number.isFinite(n) && n >= 70 && n <= 1600)
+        )
+          return v;
+      } catch {}
+      return [
+        matchMedia("(max-width: 600px)").matches ? 180 : 300,
+        115,
+        115,
+        110,
+        155,
+        125,
+        90,
+        205,
+      ];
+    }),
     [date, setDate] = useState(new Date().toLocaleDateString("en-CA")),
     [lang, setLang] = useState(localStorage.getItem("flow.lang") || "zh"),
     [theme, setTheme] = useState(
@@ -256,6 +355,7 @@ export function App() {
     [backupFile, setBackupFile] = useState(null),
     [notificationJobs, setNotificationJobs] = useState([]);
   const backupInput = useRef(null);
+  const columnDrag = useRef(null);
   const restoreInFlight = useRef(false);
   const t = (zh, en) => (lang === "zh" ? zh : en),
     c = data?.config;
@@ -273,6 +373,14 @@ export function App() {
       active = false;
     };
   }, [page, auth, data?.version]);
+  useEffect(() => {
+    const timer = setTimeout(
+      () =>
+        localStorage.setItem("flow.columns.v1", JSON.stringify(columnWidths)),
+      150,
+    );
+    return () => clearTimeout(timer);
+  }, [columnWidths]);
   useEffect(() => setTorrentPage(0), [page, search]);
   useEffect(() => {
     localStorage.setItem("flow.lang", lang);
@@ -384,7 +492,7 @@ export function App() {
   async function refresh() {
     if (!demo) {
       const v = await api(
-        `snapshot?period=${page === 1 ? period : "day"}&date=${page === 1 ? date : new Date().toLocaleDateString("en-CA")}&view=${page === 0 ? "active" : page === 1 || page === 2 ? "all" : "none"}&offset=${torrentPage * 50}&search=${encodeURIComponent(page === 1 ? search : "")}`,
+        `snapshot?period=${page === 1 ? period : "day"}&date=${page === 1 ? date : new Date().toLocaleDateString("en-CA")}&window=${speedWindow}&view=${page === 0 ? "active" : page === 1 || page === 2 ? "all" : "none"}&offset=${torrentPage * 50}&search=${encodeURIComponent(page === 1 ? search : "")}`,
       );
       setData(v);
     }
@@ -398,7 +506,7 @@ export function App() {
       inFlight = true;
       try {
         const v = await api(
-          `snapshot?period=${page === 1 ? period : "day"}&date=${page === 1 ? date : new Date().toLocaleDateString("en-CA")}&view=${page === 0 ? "active" : page === 1 || page === 2 ? "all" : "none"}&offset=${torrentPage * 50}&search=${encodeURIComponent(page === 1 ? search : "")}`,
+          `snapshot?period=${page === 1 ? period : "day"}&date=${page === 1 ? date : new Date().toLocaleDateString("en-CA")}&window=${speedWindow}&view=${page === 0 ? "active" : page === 1 || page === 2 ? "all" : "none"}&offset=${torrentPage * 50}&search=${encodeURIComponent(page === 1 ? search : "")}`,
         );
         if (alive) {
           setData(v);
@@ -416,7 +524,7 @@ export function App() {
       alive = false;
       clearInterval(timer);
     };
-  }, [auth, period, date, page, torrentPage, search]);
+  }, [auth, period, date, page, torrentPage, search, speedWindow]);
   const totals = useMemo(() => {
     const v = { up: 0, down: 0, sites: {}, uncertain: false };
     for (const b of data?.buckets || []) {
@@ -448,10 +556,11 @@ export function App() {
       t("流量总览", "Overview"),
       t("站点统计", "Sites"),
       t("带宽出口", "Bandwidth outlets"),
-      t("下载器", "Downloaders"),
-      t("设置", "Settings"),
+      t("下载管理", "Downloaders"),
+      t("系统设置", "Settings"),
       t("回调通知", "Webhook"),
       t("备份恢复", "Backup & restore"),
+      t("关于程序", "About"),
     ],
     nav = [
       House,
@@ -461,6 +570,7 @@ export function App() {
       GearSix,
       Broadcast,
       FloppyDisk,
+      Info,
     ];
   function open(kind, v = {}) {
     setModal(kind);
@@ -705,20 +815,14 @@ export function App() {
           </button>
         ))}
       </div>
-      <div className="group">
-        <button
-          className={lang === "zh" ? "active" : ""}
-          onClick={() => setLang("zh")}
-        >
-          中
-        </button>
-        <button
-          className={lang === "en" ? "active" : ""}
-          onClick={() => setLang("en")}
-        >
-          EN
-        </button>
-      </div>
+      <button
+        className="icon language-toggle"
+        aria-label={t("切换为英文", "Switch to Chinese")}
+        title={t("切换为英文", "Switch to Chinese")}
+        onClick={() => setLang(lang === "zh" ? "en" : "zh")}
+      >
+        {lang === "zh" ? "EN" : "中"}
+      </button>
     </>
   );
   const periods = (
@@ -779,7 +883,10 @@ export function App() {
               onClick={() => s.id && editSite(s)}
             >
               <td className="name">
-                <span className="dot" />
+                <span
+                  className="dot"
+                  style={{ background: siteColor(s.id, c.sites) }}
+                />
                 {s.name}
                 {page === 1 && <small>{s.domains.join(" · ")}</small>}
               </td>
@@ -951,111 +1058,183 @@ export function App() {
   const lastTorrentPage = Math.max(0, Math.ceil(torrentCount / 50) - 1);
   const currentTorrentPage = Math.min(torrentPage, lastTorrentPage);
   const torrents = (
-    <div className="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>{t("种子", "Torrent")}</th>
-            <th className="hide-phone">{t("站点", "Site")}</th>
-            <th>{t("上传连接", "Connections")}</th>
-            <th>{t("当前限速", "Limit")}</th>
-            <th>{t("状态", "State")}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {(serverPaged
-            ? visibleTorrents
-            : visibleTorrents.slice(
-                currentTorrentPage * 50,
-                (currentTorrentPage + 1) * 50,
-              )
-          ).map((x) => (
-            <tr
-              key={x.key}
-              className="action-row"
-              onClick={() =>
-                open("torrent", {
-                  key: x.key,
-                  name: x.name,
-                  site: x.site,
-                  weight: c.overrides[x.key]?.weight || 1,
-                  manage:
-                    c.overrides[x.key]?.manage ??
-                    !!c.clients.find((cl) => cl.id === x.client)?.autoManage,
-                })
-              }
-            >
-              <td className="name">
-                <span className="torrent-name">{x.name}</span>
-                <small>
-                  {t("下载器：", "Downloader: ")}
+    <div>
+      <p className="hint">
+        {t(
+          "拖动表头分隔线调整列宽；窄屏可左右滑动。列宽仅保存在此设备。",
+          "Drag header separators to resize columns; swipe horizontally on narrow screens. Widths stay on this device.",
+        )}
+      </p>
+      <div className="table-wrap">
+        <table
+          className="torrent-table"
+          style={{ minWidth: columnWidths.reduce((n, v) => n + v, 0) }}
+        >
+          <colgroup>
+            {columnWidths.map((width, i) => (
+              <col key={i} style={{ width }} />
+            ))}
+          </colgroup>
+          <thead>
+            <tr>
+              {[
+                ["种子名称", "Torrent name"],
+                ["当前上传", "Upload rate"],
+                ["当前限速", "Limit"],
+                ["状态", "State"],
+                ["下载器", "Downloader"],
+                ["站点", "Site"],
+                ["上传连接", "Connections"],
+                ["Tracker", "Tracker"],
+              ].map(([zh, en], i) => (
+                <th key={i} aria-label={t(zh, en)}>
+                  {t(zh, en)}
+                  <span
+                    className="column-handle"
+                    role="separator"
+                    aria-orientation="vertical"
+                    aria-label={t("调整列宽：", "Resize column: ") + t(zh, en)}
+                    aria-valuemin={i === 0 ? 180 : 70}
+                    aria-valuemax={1600}
+                    aria-valuenow={columnWidths[i]}
+                    tabIndex={0}
+                    onPointerDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      columnDrag.current = {
+                        index: i,
+                        x: e.clientX,
+                        width: columnWidths[i],
+                      };
+                      e.currentTarget.setPointerCapture(e.pointerId);
+                    }}
+                    onPointerMove={(e) => {
+                      const d = columnDrag.current;
+                      if (!d || d.index !== i) return;
+                      const width = Math.min(
+                        1600,
+                        Math.max(i === 0 ? 180 : 70, d.width + e.clientX - d.x),
+                      );
+                      setColumnWidths((v) =>
+                        v.map((n, j) => (j === i ? width : n)),
+                      );
+                    }}
+                    onPointerUp={() => {
+                      columnDrag.current = null;
+                    }}
+                    onPointerCancel={() => {
+                      columnDrag.current = null;
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight")
+                        return;
+                      e.preventDefault();
+                      const delta = e.key === "ArrowLeft" ? -20 : 20;
+                      setColumnWidths((v) =>
+                        v.map((n, j) =>
+                          j === i
+                            ? Math.min(
+                                1600,
+                                Math.max(i === 0 ? 180 : 70, n + delta),
+                              )
+                            : n,
+                        ),
+                      );
+                    }}
+                  />
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {(serverPaged
+              ? visibleTorrents
+              : visibleTorrents.slice(
+                  currentTorrentPage * 50,
+                  (currentTorrentPage + 1) * 50,
+                )
+            ).map((x) => (
+              <tr
+                key={x.key}
+                className="action-row"
+                onClick={() =>
+                  open("torrent", {
+                    key: x.key,
+                    name: x.name,
+                    site: x.site,
+                    weight: c.overrides[x.key]?.weight || 1,
+                    manage:
+                      c.overrides[x.key]?.manage ??
+                      !!c.clients.find((cl) => cl.id === x.client)?.autoManage,
+                  })
+                }
+              >
+                <td className="name" title={x.name}>
+                  <span className="torrent-name">{x.name}</span>
+                </td>
+                <td className="up">{bytes(x.up, true)}</td>
+                <td>
+                  {x.limit ? bytes(x.limit, true) : t("不限速", "Unlimited")}
+                </td>
+                <td>
+                  <span
+                    className={"badge state " + (!x.managed ? "neutral" : "")}
+                  >
+                    {stateLabel(x.state)}
+                  </span>
+                </td>
+                <td
+                  title={
+                    c.clients.find((cl) => cl.id === x.client)?.name ||
+                    x.client ||
+                    ""
+                  }
+                >
                   {c.clients.find((cl) => cl.id === x.client)?.name ||
                     x.client ||
                     "—"}
-                </small>
-                <small
-                  className="tracker-hosts"
-                  title={(x.hosts || []).join(" · ")}
-                >
-                  Tracker ·{" "}
-                  {(x.hosts || []).join(" · ") || t("未提供", "Not available")}
-                </small>
-                {x.ambiguous && (
-                  <small>
-                    {t(
-                      "多个站点冲突，请指定归属",
-                      "Multiple sites; select an owner",
-                    )}
-                  </small>
-                )}
-              </td>
-              <td className="hide-phone">{siteName(x.site)}</td>
-              <td>{x.connections}</td>
-              <td>
-                {x.limit ? bytes(x.limit, true) : t("不限速", "Unlimited")}
-              </td>
-              <td>
-                <span
-                  className={"badge state " + (!x.managed ? "neutral" : "")}
-                >
-                  {stateLabel(x.state)}
-                </span>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      {torrentCount > 50 && (
-        <div className="toolbar">
-          <button
-            disabled={currentTorrentPage === 0}
-            onClick={() => setTorrentPage(currentTorrentPage - 1)}
-          >
-            {t("上一页", "Previous")}
-          </button>
-          <span>
-            {currentTorrentPage + 1} / {lastTorrentPage + 1} · {torrentCount}
-          </span>
-          <button
-            disabled={currentTorrentPage === lastTorrentPage}
-            onClick={() => setTorrentPage(currentTorrentPage + 1)}
-          >
-            {t("下一页", "Next")}
-          </button>
-        </div>
-      )}
-      {!visibleTorrents.length && (
-        <div className="empty">
-          {t(
-            page === 0
-              ? "暂无正在接管且有上传连接的种子"
-              : "没有匹配的种子，连接下载器后自动采集",
-            page === 0
-              ? "No controlled torrents with active upload connections"
-              : "No matching torrents. Connect a downloader to begin.",
-          )}
-        </div>
-      )}
+                </td>
+                <td title={siteName(x.site)}>{siteName(x.site)}</td>
+                <td>{x.connections}</td>
+                <td title={(x.hosts || []).join(" · ")}>
+                  {(x.hosts || []).join(" · ") || t("暂不可用", "Unavailable")}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {torrentCount > 50 && (
+          <div className="toolbar">
+            <button
+              disabled={currentTorrentPage === 0}
+              onClick={() => setTorrentPage(currentTorrentPage - 1)}
+            >
+              {t("上一页", "Previous")}
+            </button>
+            <span>
+              {currentTorrentPage + 1} / {lastTorrentPage + 1} · {torrentCount}
+            </span>
+            <button
+              disabled={currentTorrentPage === lastTorrentPage}
+              onClick={() => setTorrentPage(currentTorrentPage + 1)}
+            >
+              {t("下一页", "Next")}
+            </button>
+          </div>
+        )}
+        {!visibleTorrents.length && (
+          <div className="empty">
+            {t(
+              page === 0
+                ? "暂无正在接管且有上传连接的种子"
+                : "没有匹配的种子，连接下载器后自动采集",
+              page === 0
+                ? "No controlled torrents with active upload connections"
+                : "No matching torrents. Connect a downloader to begin.",
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
   const field = (key, zh, en, type = "text", extra = {}) => (
@@ -1187,7 +1366,8 @@ export function App() {
           </div>
         </div>
         <nav className="nav" id="main-navigation">
-          {names.map((name, i) => {
+          {[0, 1, 2, 3, 5, 6, 4, 7].map((i) => {
+            const name = names[i];
             const I = nav[i];
             return (
               <button
@@ -1539,30 +1719,55 @@ export function App() {
             <section className="card">
               <div className="section-head">
                 <h2>{t("实时速率", "Live transfer rate")}</h2>
-                <div className="legend">
-                  <span>
-                    <i />
-                    {t("上传", "Upload")}
-                  </span>
-                  <span>
-                    <i className="blue" />
-                    {t("下载", "Download")}
-                  </span>
-                  <span className="hide-phone">
-                    {t("最近 30 分钟", "Last 30 minutes")}
-                  </span>
+                <div className="plot-controls">
+                  <select
+                    aria-label={t("速率方向", "Rate direction")}
+                    value={speedMetric}
+                    onChange={(e) => setSpeedMetric(e.target.value)}
+                  >
+                    <option value="up">{t("上传", "Upload")}</option>
+                    <option value="down">{t("下载", "Download")}</option>
+                  </select>
+                  <select
+                    aria-label={t("实时曲线范围", "Live history range")}
+                    value={speedWindow}
+                    onChange={(e) => setSpeedWindow(Number(e.target.value))}
+                  >
+                    {[
+                      [300, "5分钟", "5 min"],
+                      [900, "15分钟", "15 min"],
+                      [1800, "30分钟", "30 min"],
+                      [3600, "1小时", "1 h"],
+                      [10800, "3小时", "3 h"],
+                      [21600, "6小时", "6 h"],
+                      [43200, "12小时", "12 h"],
+                      [86400, "24小时", "24 h"],
+                    ].map(([v, zh, en]) => (
+                      <option key={v} value={v}>
+                        {t(zh, en)}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
-              {data.speeds.length ? (
+              {(data.siteSpeeds || []).length ? (
                 <Plot
-                  data={data.speeds}
+                  data={
+                    demo
+                      ? data.siteSpeeds.filter(
+                          (row) => row.time >= Date.now() / 1000 - speedWindow,
+                        )
+                      : data.siteSpeeds
+                  }
+                  sites={c.sites}
                   dark={dark}
-                  labels={[t("上传", "Upload"), t("下载", "Download")]}
+                  metric={speedMetric}
+                  rangeSeconds={speedWindow}
                 />
               ) : (
                 <div className="empty">
                   {t(
-                    "连接下载器后，这里会显示实时曲线",
+                    "连接下载器后开始记录各站点速率；升级前的总速率不会伪装成站点历史。",
                     "Connect a downloader to see live transfer rates",
                   )}
                 </div>
@@ -1573,6 +1778,26 @@ export function App() {
                 <div>
                   <h2>{t("动态带宽分配", "Dynamic bandwidth")}</h2>
                   {guard}
+                  <div className="allocation-summary">
+                    <span>
+                      {t("活跃种子", "Active torrents")}{" "}
+                      <strong>
+                        {data.activeSummary?.count ?? torrentCount}
+                      </strong>
+                    </span>
+                    <span>
+                      {t("当前上传", "Current upload")}{" "}
+                      <strong className="up">
+                        {bytes(data.activeSummary?.up ?? speed, true)}
+                      </strong>
+                    </span>
+                    {data.activeSummary && (
+                      <span>
+                        {t("已分配额度", "Allocated allowance")}{" "}
+                        <strong>{bytes(data.activeSummary.limit, true)}</strong>
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
               {torrents}
@@ -1591,13 +1816,23 @@ export function App() {
             <section className="card">
               <div className="section-head">
                 <h2>{t("流量趋势", "Traffic history")}</h2>
+                <select
+                  aria-label={t("流量方向", "Traffic direction")}
+                  value={trafficMetric}
+                  onChange={(e) => setTrafficMetric(e.target.value)}
+                >
+                  <option value="up">{t("上传", "Upload")}</option>
+                  <option value="down">{t("下载", "Download")}</option>
+                </select>
               </div>
               {buckets.length ? (
                 <Plot
-                  data={buckets}
+                  data={data.buckets}
                   bars
+                  sites={c.sites}
+                  metric={trafficMetric}
+                  rangeSeconds={data.end - data.start}
                   dark={dark}
-                  labels={[t("上传", "Upload"), t("下载", "Download")]}
                 />
               ) : (
                 <div className="empty">
@@ -1728,15 +1963,6 @@ export function App() {
                   </tbody>
                 </table>
               </div>
-            </section>
-            <section className="card">
-              <div className="section-head">
-                <h2>{t("按种子接管", "Per-torrent control")}</h2>
-                <small>
-                  {t("点击种子设置", "Click a torrent to configure")}
-                </small>
-              </div>
-              {torrents}
             </section>
             <section className="card">
               <h2>{t("恢复清单", "Recovery queue")}</h2>
@@ -1940,6 +2166,49 @@ export function App() {
                 {t("导入并恢复", "Import & restore")}
               </button>
             </div>
+          </section>
+        )}
+        {page === 7 && (
+          <section className="card about-policy">
+            <h2>Torrent Flow · {t("流量台", "Traffic monitor")}</h2>
+            <p>
+              v{data.version} · MIT License ·{" "}
+              <a
+                href="https://github.com/Stylle/torrent-flow"
+                target="_blank"
+                rel="noreferrer"
+              >
+                GitHub
+              </a>
+            </p>
+            <h3>{t("统计与自动策略", "Accounting and allocation")}</h3>
+            <p>
+              {t(
+                "所有下载器持续统计，每个下载器独立启停自动策略。相同出口共同分配预算，活跃站点先按1–10权重分配，再由站内种子平分。最低额度不足时调整，固定最低额度优先于出口预算和站点上限，超出时告警，不降低最低额度。",
+                "Monitoring stays active; each downloader independently starts/stops allocation. Downloaders share an outlet budget. Active sites receive weighted shares (1–10), split equally across torrents. Fixed minimums take precedence over budgets and site caps, with warnings.",
+              )}
+            </p>
+            <h3>{t("停止与恢复", "Stop and recovery")}</h3>
+            <p>
+              {t(
+                "停止策略会清空该下载器所有种子级上传限速，包括手工限速；不改全局限速。无连接且无流量持续15秒后释放系统限速。主服务掉线由独立守护恢复；守护、下载器或整机也离线时需等待恢复连接。",
+                "Stopping clears every torrent-level upload limit on that downloader, including manual limits, without changing global limits. Idle release defaults to15 seconds. An independent guardian recovers a stopped controller; recovery waits if the worker, downloader or host is unreachable.",
+              )}
+            </p>
+            <h3>{t("图表与数据", "Charts and data")}</h3>
+            <p>
+              {t(
+                "速率按站点记录，最多保留24小时；长时间窗口会聚合为平均速率以控制占用。统计保留一年，柱状图按站点堆叠实际字节数，提示各站点占比；不是把每根柱都强制拉成100%。离线补记不能精确还原发生时间，历史归属不重写。",
+                "Per-site rate history retains24 hours; longer windows use averaged buckets. Traffic retains one year. Bars stack actual bytes by site and show percentage shares; they are not normalized to100%. Recovered offline traffic has uncertain timing; past attribution is preserved.",
+              )}
+            </p>
+            <h3>{t("备份与通知", "Backups and notifications")}</h3>
+            <p>
+              {t(
+                "备份包含账号、配置、统计和密钥；导入前停止策略并等待清空，恢复后重新登录且策略暂停。通知支持日周月报告与告警，失败有限重试，响应丢失仍可能重复。默认50 Mbps为6.25 MB/s，最低额度默认每种子50 KB/s；额度不是实际速度保证。",
+                "Backups contain accounts, settings, statistics and keys. Stop strategies and wait for clearance before import; sign in again afterwards with allocation paused. Reports and alerts have bounded retries and may duplicate after a lost response. Default50 Mbps equals6.25 MB/s; the per-torrent minimum defaults to50 KB/s. Allowances do not guarantee actual speed.",
+              )}
+            </p>
           </section>
         )}
         {page === 4 && (

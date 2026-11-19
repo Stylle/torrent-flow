@@ -19,6 +19,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 	"unicode"
 )
@@ -27,11 +28,14 @@ import (
 var assets embed.FS
 
 type Server struct {
-	notifyMu sync.Mutex
-	e        *Engine
-	s        *Store
-	mu       sync.Mutex
-	attempts map[string][]time.Time
+	speedMu    sync.Mutex
+	speedCache map[int]speedHistoryEntry
+	speedEpoch atomic.Uint64
+	notifyMu   sync.Mutex
+	e          *Engine
+	s          *Store
+	mu         sync.Mutex
+	attempts   map[string][]time.Time
 }
 
 func digestToken(v string) string { h := sha256.Sum256([]byte(v)); return hex.EncodeToString(h[:]) }
@@ -267,6 +271,14 @@ func (sv *Server) snapshot(w http.ResponseWriter, r *http.Request) {
 		failHTTP(w, 500, "statistics unavailable")
 		return
 	}
+	window := 1800
+	if requested, err := strconv.Atoi(r.URL.Query().Get("window")); err == nil {
+		switch requested {
+		case 300, 900, 1800, 3600, 10800, 21600, 43200, 86400:
+			window = requested
+		}
+	}
+	siteSpeeds := sv.siteSpeedHistory(window)
 	speeds := []map[string]int64{}
 	rows, err := sv.s.db.Query("SELECT at,up,down FROM speeds WHERE at>? ORDER BY at", time.Now().Add(-30*time.Minute).Unix())
 	if err == nil {
@@ -299,10 +311,19 @@ func (sv *Server) snapshot(w http.ResponseWriter, r *http.Request) {
 		rows.Close()
 	}
 	siteRates := map[string]int64{}
+	activeSummary := map[string]int64{"count": 0, "up": 0, "managed": 0, "limit": 0}
 	for _, t := range torrents {
 		siteRates[t.Site] += t.Up
+		if t.Connections > 0 || t.Up > 0 {
+			activeSummary["count"]++
+			activeSummary["up"] += t.Up
+			if t.Managed {
+				activeSummary["managed"]++
+				activeSummary["limit"] += t.Limit
+			}
+		}
 	}
-	payload := map[string]any{"version": Version, "config": redacted(c), "clients": statuses, "warnings": warnings, "buckets": buckets, "speeds": speeds, "leases": leases, "events": events, "guardian": time.Now().Unix()-heartbeat(sv.s, "guardian") < 20, "start": start.Unix(), "end": end.Unix(), "siteRates": siteRates}
+	payload := map[string]any{"version": Version, "config": redacted(c), "clients": statuses, "warnings": warnings, "buckets": buckets, "speeds": speeds, "leases": leases, "events": events, "guardian": time.Now().Unix()-heartbeat(sv.s, "guardian") < 20, "start": start.Unix(), "end": end.Unix(), "siteRates": siteRates, "siteSpeeds": siteSpeeds, "speedWindow": window, "activeSummary": activeSummary}
 	if view := r.URL.Query().Get("view"); view != "" {
 		needle := strings.ToLower(r.URL.Query().Get("search"))
 		if len(needle) > 256 {

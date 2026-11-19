@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-const Version = "0.1.5"
+const Version = "0.1.6"
 
 type Client struct {
 	StrategyEnabled *bool  `json:"strategyEnabled"`

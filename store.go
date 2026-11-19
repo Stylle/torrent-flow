@@ -99,6 +99,7 @@ CREATE TABLE IF NOT EXISTS traffic(id INTEGER PRIMARY KEY,k TEXT,site TEXT,at IN
 CREATE INDEX IF NOT EXISTS traffic_at ON traffic(at);
 CREATE INDEX IF NOT EXISTS traffic_rollup ON traffic(k,site,at);
 CREATE TABLE IF NOT EXISTS speeds(at INTEGER PRIMARY KEY,up INTEGER,down INTEGER);
+CREATE TABLE IF NOT EXISTS site_speeds(at INTEGER,site TEXT,up INTEGER,down INTEGER,PRIMARY KEY(at,site));
 CREATE TABLE IF NOT EXISTS leases(k TEXT PRIMARY KEY,client TEXT,hash TEXT,original INTEGER,last INTEGER,planned INTEGER,state TEXT,at INTEGER);
 CREATE TABLE IF NOT EXISTS control_blocks(k TEXT PRIMARY KEY,at INTEGER);
 CREATE TABLE IF NOT EXISTS events(id INTEGER PRIMARY KEY,at INTEGER,kind TEXT,k TEXT,message TEXT);
@@ -245,6 +246,7 @@ func (s *Store) ingest(client string, items []Torrent, now time.Time, poll int) 
 	if now.Unix()-maintenance >= 3600 || now.Unix() < maintenance {
 		tx.Exec("DELETE FROM traffic WHERE at<?", now.AddDate(-1, 0, 0).Unix())
 		tx.Exec("DELETE FROM speeds WHERE at<?", now.Add(-24*time.Hour).Unix())
+		tx.Exec("DELETE FROM site_speeds WHERE at<?", now.Add(-24*time.Hour).Unix())
 		tx.Exec("DELETE FROM sessions WHERE expires<?", now.Unix())
 		tx.Exec("DELETE FROM events WHERE at<?", now.AddDate(-1, 0, 0).Unix())
 		tx.Exec("INSERT OR REPLACE INTO settings VALUES('maintenance',?)", now.Unix())
