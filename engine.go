@@ -264,9 +264,10 @@ func (e *Engine) tick(ctx context.Context) {
 			totalFloor += floor
 			siteItems = append(siteItems, Allocation{id, s.Weight, 0, maximum})
 		}
-		siteBudgets, exceeded := allocateSiteShares(pool.Budget, siteItems, floors)
+		effectiveBudget, _ := pool.effectiveBudget(now)
+		siteBudgets, exceeded := allocateSiteShares(effectiveBudget, siteItems, floors)
 		if exceeded {
-			warnings = append(warnings, fmt.Sprintf("出口 %s：最低额度合计 %d KB/s，超过预算 %d KB/s；最低额度保持不变 / Minimum allowances exceed outlet budget", pool.Name, totalFloor/1000, pool.Budget/1000))
+			warnings = append(warnings, fmt.Sprintf("出口 %s：最低额度合计 %d KB/s，超过预算 %d KB/s；最低额度保持不变 / Minimum allowances exceed outlet budget", pool.Name, totalFloor/1000, effectiveBudget/1000))
 		}
 		for site, ts := range groups {
 			var items []Allocation

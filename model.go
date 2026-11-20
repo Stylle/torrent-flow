@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-const Version = "0.1.6"
+const Version = "0.1.7"
 
 type Client struct {
 	StrategyEnabled *bool  `json:"strategyEnabled"`
@@ -39,10 +39,11 @@ type Site struct {
 	AfterTarget int64    `json:"afterTarget"`
 }
 type Pool struct {
-	ID      string `json:"id"`
-	Name    string `json:"name"`
-	Budget  int64  `json:"budget"`
-	Enabled bool   `json:"enabled"`
+	Schedule OutletSchedule `json:"schedule"`
+	ID       string         `json:"id"`
+	Name     string         `json:"name"`
+	Budget   int64          `json:"budget"`
+	Enabled  bool           `json:"enabled"`
 }
 type Override struct {
 	Site   string `json:"site"`
@@ -220,6 +221,9 @@ func (c Config) validate() error {
 	}
 	pools := map[string]bool{}
 	for _, p := range c.Pools {
+		if err := p.Schedule.validate(); err != nil {
+			return err
+		}
 		if !check(p.ID) || p.Budget < 1024 || p.Budget > 1<<40 || p.Name == "" {
 			return fmt.Errorf("invalid pool")
 		}

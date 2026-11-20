@@ -323,7 +323,12 @@ func (sv *Server) snapshot(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	payload := map[string]any{"version": Version, "config": redacted(c), "clients": statuses, "warnings": warnings, "buckets": buckets, "speeds": speeds, "leases": leases, "events": events, "guardian": time.Now().Unix()-heartbeat(sv.s, "guardian") < 20, "start": start.Unix(), "end": end.Unix(), "siteRates": siteRates, "siteSpeeds": siteSpeeds, "speedWindow": window, "activeSummary": activeSummary}
+	outletBudgets := map[string]any{}
+	for _, pool := range c.Pools {
+		budget, night := pool.effectiveBudget(time.Now().In(loc))
+		outletBudgets[pool.ID] = map[string]any{"budget": budget, "night": night, "timezone": c.Timezone}
+	}
+	payload := map[string]any{"version": Version, "config": redacted(c), "clients": statuses, "warnings": warnings, "buckets": buckets, "speeds": speeds, "leases": leases, "events": events, "guardian": time.Now().Unix()-heartbeat(sv.s, "guardian") < 20, "start": start.Unix(), "end": end.Unix(), "siteRates": siteRates, "siteSpeeds": siteSpeeds, "speedWindow": window, "activeSummary": activeSummary, "outletBudgets": outletBudgets}
 	if view := r.URL.Query().Get("view"); view != "" {
 		needle := strings.ToLower(r.URL.Query().Get("search"))
 		if len(needle) > 256 {

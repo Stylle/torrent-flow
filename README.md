@@ -126,3 +126,11 @@ MIT。功能调研参考 [torrent-traffic-monitor](https://github.com/ystykxc/to
 ---
 
 **English:** Self-hosted qBittorrent/Transmission traffic accounting and per-downloader upload allocation. Downloaders share named uplink budgets; site weights range from 1 to 10. Fixed per-torrent minimums take precedence over budgets with a warning. Monitoring stays active when allocation is stopped. Includes paginated lists, portable backups, configurable Webhooks, daily/weekly/monthly reports and persisted delivery retries. The default deployment includes an independent recovery guardian.
+
+## 日夜出口预算
+
+每个带宽出口可独立开启定时切换：日间/基础预算用于时段外，夜间预算用于选定星期的时段内。默认时间 23:00–次日 08:00、每天，定时默认关闭；首次编辑时夜间预算与当前基础预算相同，按需调整。时间使用系统设置中的时区，在下一轮采样时生效。
+
+跨午夜按开始日期选择星期，例如仅勾周一表示周一 23:00 到周二 08:00。关闭定时恢复基础预算，不会停止统计或下载器自动策略。最低额度仍优先，合计超过当前预算时保留最低额度并告警。
+
+站点最大上传额度是分配上限：封顶后多余预算会按其余站点权重继续分配，不修改保存的权重。例如 1,000 KB/s、权重 1:2:2，第一站点封顶 100 KB/s，分配为 100/450/450 KB/s；站点内部再均分给活跃种子。所有站点均封顶时允许预算剩余，不突破上限；固定最低额度高于上限的例外会明确告警。

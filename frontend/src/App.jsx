@@ -61,7 +61,7 @@ function demoData() {
       afterTarget: MB,
     }));
   return {
-    version: "0.1.6",
+    version: "0.1.7",
     start: new Date(new Date().setHours(0, 0, 0, 0)).getTime() / 1000,
     end: new Date(new Date().setHours(24, 0, 0, 0)).getTime() / 1000,
     config: {
@@ -573,6 +573,26 @@ export function App() {
       Info,
     ];
   function open(kind, v = {}) {
+    if (kind === "pool") {
+      const schedule = v.schedule || {};
+      const nightBudget =
+        schedule.nightBudget ||
+        Math.round((Number(v.budget) * 1000000) / 8) ||
+        6250000;
+      v = {
+        ...v,
+        schedule: {
+          enabled: !!schedule.enabled,
+          nightBudget,
+          start: schedule.start || "23:00",
+          end: schedule.end || "08:00",
+          days: Array.isArray(schedule.days)
+            ? schedule.days
+            : [0, 1, 2, 3, 4, 5, 6],
+        },
+        nightMbps: (nightBudget * 8) / 1000000,
+      };
+    }
     setModal(kind);
     setError("");
     setForm(structuredClone(v));
@@ -700,6 +720,11 @@ export function App() {
       if (modal === "pool") {
         v.enabled = true;
         v.budget = Math.round((Number(v.budget) * 1000000) / 8);
+        v.schedule = {
+          ...v.schedule,
+          nightBudget: Math.round((Number(v.nightMbps) * 1000000) / 8),
+        };
+        delete v.nightMbps;
         if (!next.pools.length)
           next.clients = next.clients.map((cl) =>
             cl.pool ? cl : { ...cl, pool: v.id },
@@ -1916,7 +1941,22 @@ export function App() {
                 <div className="stat-label">
                   {t("总上传额度", "Upload budget")}
                 </div>
-                <h1>{bytes(p.budget, true)}</h1>
+                <h1>
+                  {bytes(data.outletBudgets?.[p.id]?.budget ?? p.budget, true)}
+                </h1>
+                <p className="hint">
+                  {data.outletBudgets?.[p.id]?.night
+                    ? t("当前：夜间预算", "Active: night budget")
+                    : t("当前：日间/基础预算", "Active: day/base budget")}{" "}
+                  · {c.timezone}
+                </p>
+                {p.schedule?.enabled && (
+                  <p className="hint">
+                    {t("日间", "Day")} {bytes(p.budget, true)} ·{" "}
+                    {t("夜间", "Night")} {bytes(p.schedule.nightBudget, true)} ·{" "}
+                    {p.schedule.start} — {p.schedule.end}
+                  </p>
+                )}
                 <p className="subtitle">
                   {c.clients
                     .filter((cl) => cl.pool === p.id)
@@ -2524,15 +2564,127 @@ export function App() {
                     {field("name", "名称", "Name", "text", { required: true })}
                     {field(
                       "budget",
-                      "出口上传带宽 Mbps（默认 50）",
+                      "日间/基础上传带宽 Mbps（默认 50）",
                       "Outlet upload bandwidth Mbps (default 50)",
                       "number",
                       { required: true, min: 0.001, step: "any" },
                     )}
+                    <h3>{t("夜间备用预算", "Night budget")}</h3>
+                    <label className="checkbox">
+                      <input
+                        type="checkbox"
+                        checked={!!form.schedule?.enabled}
+                        onChange={(e) =>
+                          setForm({
+                            ...form,
+                            schedule: {
+                              ...form.schedule,
+                              enabled: e.target.checked,
+                            },
+                          })
+                        }
+                      />
+                      {t(
+                        "按时间自动切换日夜预算",
+                        "Automatically switch day/night budgets",
+                      )}
+                    </label>
+                    <div
+                      className="schedule-fields"
+                      style={{ opacity: form.schedule?.enabled ? 1 : 0.65 }}
+                    >
+                      <fieldset disabled={!form.schedule?.enabled}>
+                        {field(
+                          "nightMbps",
+                          "夜间上传带宽 Mbps",
+                          "Night upload bandwidth Mbps",
+                          "number",
+                          {
+                            min: 0.01,
+                            step: "any",
+                            required: !!form.schedule?.enabled,
+                          },
+                        )}
+                        <div className="field-pair">
+                          <label>
+                            {t("从", "From")}
+                            <input
+                              type="time"
+                              value={form.schedule?.start || "23:00"}
+                              onChange={(e) =>
+                                setForm({
+                                  ...form,
+                                  schedule: {
+                                    ...form.schedule,
+                                    start: e.target.value,
+                                  },
+                                })
+                              }
+                            />
+                          </label>
+                          <label>
+                            {t("到", "To")}
+                            <input
+                              type="time"
+                              value={form.schedule?.end || "08:00"}
+                              onChange={(e) =>
+                                setForm({
+                                  ...form,
+                                  schedule: {
+                                    ...form.schedule,
+                                    end: e.target.value,
+                                  },
+                                })
+                              }
+                            />
+                          </label>
+                        </div>
+                        <div className="weekday-options">
+                          {[
+                            [1, "周一", "Mon"],
+                            [2, "周二", "Tue"],
+                            [3, "周三", "Wed"],
+                            [4, "周四", "Thu"],
+                            [5, "周五", "Fri"],
+                            [6, "周六", "Sat"],
+                            [0, "周日", "Sun"],
+                          ].map(([day, zh, en]) => (
+                            <label className="checkbox" key={day}>
+                              <input
+                                type="checkbox"
+                                checked={
+                                  form.schedule?.days?.includes(day) || false
+                                }
+                                onChange={(e) =>
+                                  setForm({
+                                    ...form,
+                                    schedule: {
+                                      ...form.schedule,
+                                      days: e.target.checked
+                                        ? [...(form.schedule?.days || []), day]
+                                        : (form.schedule?.days || []).filter(
+                                            (d) => d !== day,
+                                          ),
+                                    },
+                                  })
+                                }
+                              />
+                              {t(zh, en)}
+                            </label>
+                          ))}
+                        </div>
+                      </fieldset>
+                    </div>
                     <small>
                       {t(
-                        "默认出口 50 Mbps = 6.25 MB/s ≈ 5.96 MiB/s，不是 7 MiB/s。下载器默认绑定；可按实际出口修改，由顶部总开关管理调速，统计始终运行。",
-                        "Default outlet is 50 Mbps (6.25 MB/s, about 5.96 MiB/s). Downloaders bind automatically. Edit it for your uplink; the master switch controls allocation while monitoring always runs.",
+                        "默认23:00至次日08:00，每天启用，定时开关默认关闭。按系统时区执行；星期指夜间开始的日期，例如勾选周一会覆盖周一23:00至周二08:00。其余时间使用日间/基础预算，不改变下载器策略开关。",
+                        "Defaults to23:00–08:00 every day, scheduling off. Uses the configured timezone. Weekdays identify the start date: Monday covers Monday23:00 through Tuesday08:00. Other times use the base budget; downloader strategy switches are unchanged.",
+                      )}
+                    </small>
+                    <small>
+                      {t(
+                        "默认出口 50 Mbps = 6.25 MB/s ≈ 5.96 MiB/s，不是 7 MiB/s。下载器默认绑定；可按实际出口修改，由各下载器的策略开关管理调速，统计始终运行。",
+                        "Default outlet is 50 Mbps (6.25 MB/s, about 5.96 MiB/s). Downloaders bind automatically. Edit it for your uplink; each downloader strategy switch controls allocation while monitoring always runs.",
                       )}
                     </small>
                   </>
