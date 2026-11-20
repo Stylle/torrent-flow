@@ -1,5 +1,7 @@
 # Contributor instructions
 
+Overview upload/download cards use the durable lifetime singleton, incremented atomically with traffic deltas/baselines and never retention-pruned. Legacy installations/backups initialize it once from retained traffic only; do not sum downloader counters or claim recovery of expired data. Period statistics and chart ranges remain independent. Backups must restore the aggregate or reconstruct it for old archives.
+
 Read README.md, SECURITY.md and docs/ARCHITECTURE.md before changes. Preserve downloader authentication, per-torrent identity, cumulative accounting, credential encryption and durable recovery ownership contracts.
 
 Never operate on a real downloader in tests. Use isolated httptest/Playwright fixtures. Do not commit actual credentials, passkeys, data volumes, SQLite files, encryption keys, private screenshots or logs.

@@ -167,22 +167,34 @@ func (sv *Server) backup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer tx.Rollback()
-	for _, table := range []string{"baseline", "traffic", "speeds", "site_speeds", "control_blocks", "events", "notification_jobs"} {
+	for _, table := range []string{"baseline", "traffic", "speeds", "site_speeds", "lifetime", "control_blocks", "events", "notification_jobs"} {
 		if _, err = tx.Exec("DELETE FROM " + table); err != nil {
 			break
 		}
-		if table == "site_speeds" {
+		if table == "site_speeds" || table == "lifetime" {
 			var present int
-			if tx.QueryRow("SELECT COUNT(*) FROM imported.sqlite_master WHERE type='table' AND name='site_speeds'").Scan(&present) != nil {
+			if tx.QueryRow("SELECT COUNT(*) FROM imported.sqlite_master WHERE type='table' AND name=?", table).Scan(&present) != nil {
 				err = fmt.Errorf("cannot inspect chart history")
 				break
 			}
 			if present == 0 {
+				if table == "lifetime" {
+					_, err = tx.Exec("INSERT INTO lifetime SELECT 1,COALESCE(SUM(up),0),COALESCE(SUM(down),0),COALESCE(MAX(uncertain),0) FROM traffic")
+					if err != nil {
+						break
+					}
+				}
 				continue
 			}
 		}
 		if _, err = tx.Exec("INSERT INTO " + table + " SELECT * FROM imported." + table); err != nil {
 			break
+		}
+	}
+	if err == nil {
+		var count, up, down int64
+		if err = tx.QueryRow("SELECT COUNT(*),COALESCE(MIN(up),-1),COALESCE(MIN(down),-1) FROM lifetime WHERE id=1").Scan(&count, &up, &down); err == nil && (count != 1 || up < 0 || down < 0) {
+			err = fmt.Errorf("invalid cumulative totals")
 		}
 	}
 	if err == nil {

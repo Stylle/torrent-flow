@@ -33,6 +33,7 @@ func TestPortableBackupRestoreAcrossKeys(t *testing.T) {
 	}
 	source.db.Exec("INSERT INTO site_speeds VALUES(1,'site',123,4)")
 	source.db.Exec("INSERT INTO traffic(k,site,at,up,down,uncertain)VALUES('fixture:abc','site',1,12345,99,0)")
+	source.db.Exec("UPDATE lifetime SET up=99999,down=777 WHERE id=1")
 	archive := filepath.Join(t.TempDir(), "backup.zip")
 	if err := portablebackup.Export(sourceDir, source.db, flowBackupSpec, archive); err != nil {
 		t.Fatal(err)
@@ -63,6 +64,10 @@ func TestPortableBackupRestoreAcrossKeys(t *testing.T) {
 	if up != 12345 {
 		t.Fatal("statistics lost")
 	}
+	var lifetimeUp int64
+	if err := dest.db.QueryRow("SELECT up FROM lifetime WHERE id=1").Scan(&lifetimeUp); err != nil || lifetimeUp != 99999 {
+		t.Fatal("lifetime totals lost during restore")
+	}
 	var hash []byte
 	dest.db.QueryRow("SELECT v FROM settings WHERE k='password'").Scan(&hash)
 	if bcrypt.CompareHashAndPassword(hash, []byte("SourceFixture!Password123")) != nil {
@@ -78,6 +83,7 @@ func TestPortableBackupRestoreAcrossKeys(t *testing.T) {
 		t.Fatal("pre-restore backup not retained")
 	}
 	source.db.Exec("DROP TABLE site_speeds")
+	source.db.Exec("DROP TABLE lifetime")
 	legacy := filepath.Join(t.TempDir(), "legacy.zip")
 	if err := portablebackup.Export(sourceDir, source.db, flowBackupSpec, legacy); err != nil {
 		t.Fatal(err)
@@ -89,6 +95,9 @@ func TestPortableBackupRestoreAcrossKeys(t *testing.T) {
 	sv.backup(legacyResponse, legacyRequest)
 	if legacyResponse.Code != 200 {
 		t.Fatal("pre-site-chart backup was rejected")
+	}
+	if err := dest.db.QueryRow("SELECT up FROM lifetime WHERE id=1").Scan(&lifetimeUp); err != nil || lifetimeUp != 12345 {
+		t.Fatal("legacy restore did not derive lifetime from retained traffic")
 	}
 	broken := httptest.NewRequest("POST", "/api/backup", bytes.NewReader([]byte("not a zip")))
 	broken.Header.Set("X-Confirm-Restore", "replace")

@@ -98,6 +98,8 @@ CREATE TABLE IF NOT EXISTS baseline(k TEXT PRIMARY KEY,up INTEGER,down INTEGER,a
 CREATE TABLE IF NOT EXISTS traffic(id INTEGER PRIMARY KEY,k TEXT,site TEXT,at INTEGER,up INTEGER,down INTEGER,uncertain INTEGER);
 CREATE INDEX IF NOT EXISTS traffic_at ON traffic(at);
 CREATE INDEX IF NOT EXISTS traffic_rollup ON traffic(k,site,at);
+CREATE TABLE IF NOT EXISTS lifetime(id INTEGER PRIMARY KEY CHECK(id=1),up INTEGER NOT NULL,down INTEGER NOT NULL,uncertain INTEGER NOT NULL);
+INSERT OR IGNORE INTO lifetime SELECT 1,COALESCE(SUM(up),0),COALESCE(SUM(down),0),COALESCE(MAX(uncertain),0) FROM traffic;
 CREATE TABLE IF NOT EXISTS speeds(at INTEGER PRIMARY KEY,up INTEGER,down INTEGER);
 CREATE TABLE IF NOT EXISTS site_speeds(at INTEGER,site TEXT,up INTEGER,down INTEGER,PRIMARY KEY(at,site));
 CREATE TABLE IF NOT EXISTS leases(k TEXT PRIMARY KEY,client TEXT,hash TEXT,original INTEGER,last INTEGER,planned INTEGER,state TEXT,at INTEGER);
@@ -234,6 +236,9 @@ func (s *Store) ingest(client string, items []Torrent, now time.Time, poll int) 
 						_, e = tx.Exec("INSERT INTO traffic(k,site,at,up,down,uncertain) VALUES(?,?,?,?,?,?)", t.Key, t.Site, now.Unix(), u, d, uncertain)
 					}
 					if e != nil {
+						return e
+					}
+					if _, e = tx.Exec("UPDATE lifetime SET up=up+?,down=down+?,uncertain=MAX(uncertain,?) WHERE id=1", u, d, uncertain); e != nil {
 						return e
 					}
 				}

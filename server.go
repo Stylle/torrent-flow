@@ -275,6 +275,15 @@ func (sv *Server) snapshot(w http.ResponseWriter, r *http.Request) {
 		failHTTP(w, 500, "statistics unavailable")
 		return
 	}
+	var lifetime struct {
+		Up        int64 `json:"up"`
+		Down      int64 `json:"down"`
+		Uncertain bool  `json:"uncertain"`
+	}
+	if err = sv.s.db.QueryRow("SELECT up,down,uncertain FROM lifetime WHERE id=1").Scan(&lifetime.Up, &lifetime.Down, &lifetime.Uncertain); err != nil {
+		failHTTP(w, 500, "cumulative statistics unavailable")
+		return
+	}
 	window := 1800
 	if requested, err := strconv.Atoi(r.URL.Query().Get("window")); err == nil {
 		switch requested {
@@ -350,6 +359,7 @@ func (sv *Server) snapshot(w http.ResponseWriter, r *http.Request) {
 	}
 	payload := map[string]any{"version": Version, "config": redacted(c), "clients": statuses, "warnings": warnings, "buckets": buckets, "speeds": speeds, "leases": leases, "events": events, "guardian": time.Now().Unix()-heartbeat(sv.s, "guardian") < 20, "start": start.Unix(), "end": end.Unix(), "siteRates": siteRates, "siteSpeeds": siteSpeeds, "speedWindow": window, "activeSummary": activeSummary, "outletBudgets": outletBudgets, "catalog": sv.e.catalog.status(), "downloaderStats": downloaderStats}
 	if r.URL.Query().Get("view") == "active" {
+		payload["lifetime"] = lifetime
 		downloads := []Torrent{}
 		var downloadRate int64
 		for _, torrent := range torrents {

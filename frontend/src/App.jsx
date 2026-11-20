@@ -50,7 +50,7 @@ function demoData() {
       afterTarget: MB,
     }));
   return {
-    version: "0.1.8",
+    version: "0.1.9",
     catalog: {
       sites: 329,
       domains: 780,
@@ -548,8 +548,8 @@ export function App() {
       v.sites[b.site].up += b.up;
       v.sites[b.site].down += b.down;
     }
-    return v;
-  }, [data]);
+    return page === 0 && data?.lifetime ? { ...v, ...data.lifetime } : v;
+  }, [data, page]);
   const buckets = useMemo(() => {
     const m = {};
     for (const b of data?.buckets || []) {
@@ -1842,13 +1842,13 @@ export function App() {
               {[
                 [
                   ArrowUp,
-                  t("区间上传", "Period upload"),
+                  page === 0 ? t("累计上传", "Total upload") : t("区间上传", "Period upload"),
                   bytes(totals.up),
                   "up",
                 ],
                 [
                   ArrowDown,
-                  t("区间下载", "Period download"),
+                  page === 0 ? t("累计下载", "Total download") : t("区间下载", "Period download"),
                   bytes(totals.down),
                   "down",
                 ],
@@ -1870,10 +1870,15 @@ export function App() {
                 </div>
               ))}
             </div>
+            {page === 0 && (
+              <small className="muted">
+                {t("累计自已采集历史持续增加，不随每日切换或明细清理归零。", "Totals accumulate recorded history and survive daily rollover and detail expiry.")}
+              </small>
+            )}
             {totals.uncertain && (
               <div className="notice">
                 {t(
-                  "此区间含离线后补记流量，发生时间无法精确还原。",
+                  "统计含离线后补记流量，发生时间无法精确还原。",
                   "Includes recovered traffic whose exact transfer times are unknown.",
                 )}
               </div>

@@ -1,3 +1,8 @@
+# 0.1.9
+
+- Overview now shows persistent cumulative upload/download rather than daily totals; period filters remain in statistics.
+- Transactional aggregate survives restart and detailed-history expiry. Existing history seeds upgrades once; complete backups preserve totals and legacy imports rebuild from retained rows.
+
 # Changelog
 
 ## 0.1.8 · 2026-11-20
