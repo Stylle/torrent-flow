@@ -1,0 +1,3 @@
+import test from 'node:test';import assert from 'node:assert/strict';import{formatBytes,rateInput,rateBytes}from '../src/units.js';
+test('decimal units agree for rates and traffic',()=>{assert.equal(formatBytes(1000000),'1 MB');assert.equal(formatBytes(1048576),'1.049 MB');assert.equal(formatBytes(6250000,true),'6.25 MB/s');assert.equal(formatBytes(50000,true),'50 KB/s');assert.equal(formatBytes(0,true),'0 KB/s');assert.equal(formatBytes(1,true),'0.001 KB/s')});
+test('KB rate input roundtrips old byte values without changing limits',()=>{for(const v of[1,1024,50000,52429,1048576,6250000])assert.equal(rateBytes(rateInput(v)),v)});

@@ -12,3 +12,7 @@ Torrent Flow is MIT licensed. Runtime and build dependencies retain their upstre
 The repository used for feature research is credited in README.md; no source files or interface screenshots from that project are redistributed as this implementation's own code or assets.
 
 Portable archive validation/snapshot code under internal/portablebackup is reused from [Stylle/today-random-movie-web](https://github.com/Stylle/today-random-movie-web) (MIT). Webhook JSON template escaping is adapted from [Stylle/wusaqi-gallery-go](https://github.com/Stylle/wusaqi-gallery-go) (MIT). Their author and MIT notices remain covered by LICENSE; the original projects retain their own notices.
+
+## PT-depiler site metadata
+
+The bundled public site catalog is derived from pt-plugins/PT-depiler siteMetadata definitions (name, id, urls, legacyUrls and trackerUrls). Upstream source: https://github.com/pt-plugins/PT-depiler . MIT license retained in licenses/PT-depiler-MIT.txt. Snapshot commit is embedded in site_catalog.json. Runtime updates read literal data only; no upstream JavaScript is executed. Some dynamic definitions and dead sites are intentionally skipped, so coverage is not exhaustive.

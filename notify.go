@@ -231,7 +231,7 @@ func (s *Store) reportMessage(c Config, kind string, start, end time.Time) (stri
 	for _, site := range c.Sites {
 		names[site.ID] = site.Name
 	}
-	lines := []string{"流量台 · " + kind, "统计区间：" + start.Format("2006-01-02") + " — " + end.Add(-time.Second).Format("2006-01-02"), fmt.Sprintf("上传：%.3f GB\n下载：%.3f GB", float64(up)/1e9, float64(down)/1e9), "站点上传："}
+	lines := []string{"流量台 · " + kind, "统计区间：" + start.Format("2006-01-02") + " — " + end.Add(-time.Second).Format("2006-01-02"), fmt.Sprintf("上传：%s\n下载：%s", formatBytes(up, false), formatBytes(down, false)), "站点上传："}
 	ids := []string{}
 	for id := range totals {
 		ids = append(ids, id)
@@ -242,7 +242,7 @@ func (s *Store) reportMessage(c Config, kind string, start, end time.Time) (stri
 		if name == "" {
 			name = "历史归属 / Historical attribution"
 		}
-		lines = append(lines, fmt.Sprintf("%s：%.3f GB", name, float64(totals[id])/1e9))
+		lines = append(lines, fmt.Sprintf("%s：%s", name, formatBytes(totals[id], false)))
 	}
 	lines = append(lines, "注：离线补记可能无法精确还原发生时间；报告覆盖实际保留的数据。")
 	return strings.Join(lines, "\n"), nil
@@ -321,7 +321,7 @@ func (sv *Server) notificationTick(ctx context.Context, now time.Time) {
 			messages = append(messages, "恢复守护未连接，自动调速已暂停 / Recovery guardian offline; allocation suspended")
 		}
 		for _, cl := range c.Clients {
-			if cl.ClearPending {
+			if cl.ClearPending || cl.RestorePending {
 				messages = append(messages, "下载器限速清空待重试："+cl.Name)
 			}
 		}

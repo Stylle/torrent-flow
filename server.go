@@ -16,6 +16,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -146,6 +147,9 @@ func (sv *Server) handler() http.Handler {
 	})
 	api.HandleFunc("GET /api/snapshot", sv.snapshot)
 	api.HandleFunc("POST /api/config", sv.save)
+	api.HandleFunc("GET /api/site-catalog", sv.catalogSettings)
+	api.HandleFunc("POST /api/site-catalog", sv.catalogSettings)
+	api.HandleFunc("POST /api/client-enabled", sv.clientEnabled)
 	api.HandleFunc("POST /api/test-client", sv.testClient)
 	api.HandleFunc("POST /api/release", sv.release)
 	api.HandleFunc("POST /api/password", sv.password)
@@ -306,6 +310,7 @@ func (sv *Server) snapshot(w http.ResponseWriter, r *http.Request) {
 		for rows.Next() {
 			var e Event
 			rows.Scan(&e.Time, &e.Kind, &e.Key, &e.Message)
+			e.Message = normalizedRateText(e.Message)
 			events = append(events, e)
 		}
 		rows.Close()
@@ -323,12 +328,52 @@ func (sv *Server) snapshot(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+	downloaderStats := []map[string]any{}
+	if r.URL.Query().Get("group") == "downloaders" {
+		rows, err = sv.s.db.Query("SELECT substr(k,1,instr(k,':')-1),SUM(up),SUM(down),MAX(uncertain) FROM traffic WHERE at>=? AND at<? GROUP BY substr(k,1,instr(k,':')-1)", start.Unix(), end.Unix())
+		if err == nil {
+			for rows.Next() {
+				var id string
+				var up, down int64
+				var uncertain int
+				rows.Scan(&id, &up, &down, &uncertain)
+				downloaderStats = append(downloaderStats, map[string]any{"id": id, "up": up, "down": down, "uncertain": uncertain != 0})
+			}
+			rows.Close()
+		}
+	}
+
 	outletBudgets := map[string]any{}
 	for _, pool := range c.Pools {
 		budget, night := pool.effectiveBudget(time.Now().In(loc))
 		outletBudgets[pool.ID] = map[string]any{"budget": budget, "night": night, "timezone": c.Timezone}
 	}
-	payload := map[string]any{"version": Version, "config": redacted(c), "clients": statuses, "warnings": warnings, "buckets": buckets, "speeds": speeds, "leases": leases, "events": events, "guardian": time.Now().Unix()-heartbeat(sv.s, "guardian") < 20, "start": start.Unix(), "end": end.Unix(), "siteRates": siteRates, "siteSpeeds": siteSpeeds, "speedWindow": window, "activeSummary": activeSummary, "outletBudgets": outletBudgets}
+	payload := map[string]any{"version": Version, "config": redacted(c), "clients": statuses, "warnings": warnings, "buckets": buckets, "speeds": speeds, "leases": leases, "events": events, "guardian": time.Now().Unix()-heartbeat(sv.s, "guardian") < 20, "start": start.Unix(), "end": end.Unix(), "siteRates": siteRates, "siteSpeeds": siteSpeeds, "speedWindow": window, "activeSummary": activeSummary, "outletBudgets": outletBudgets, "catalog": sv.e.catalog.status(), "downloaderStats": downloaderStats}
+	if r.URL.Query().Get("view") == "active" {
+		downloads := []Torrent{}
+		var downloadRate int64
+		for _, torrent := range torrents {
+			if torrent.Downloading || torrent.Down > 0 {
+				downloads = append(downloads, torrent)
+				downloadRate += torrent.Down
+			}
+		}
+		sort.SliceStable(downloads, func(i, j int) bool {
+			if downloads[i].Down == downloads[j].Down {
+				return downloads[i].Key < downloads[j].Key
+			}
+			return downloads[i].Down > downloads[j].Down
+		})
+		offset, _ := strconv.Atoi(r.URL.Query().Get("downloadOffset"))
+		offset = max(0, offset) / 50 * 50
+		if offset >= len(downloads) {
+			offset = max(0, (len(downloads)-1)/50*50)
+		}
+		payload["downloadingTotal"] = len(downloads)
+		payload["downloadOffset"] = offset
+		payload["downloadRate"] = downloadRate
+		payload["downloading"] = downloads[offset:min(len(downloads), offset+50)]
+	}
 	if view := r.URL.Query().Get("view"); view != "" {
 		needle := strings.ToLower(r.URL.Query().Get("search"))
 		if len(needle) > 256 {
@@ -376,13 +421,13 @@ func (sv *Server) save(w http.ResponseWriter, r *http.Request) {
 		c.Sites = []Site{}
 	}
 	if len(c.Pools) == 0 {
-		c.Pools = []Pool{{ID: "default-outlet", Name: "默认出口 · 50 Mbps", Budget: 6250000, Enabled: true}}
+		c.Pools = []Pool{{ID: "default-outlet", Name: "默认出口", Budget: 6250000, Enabled: true}}
 	}
 	for i := range c.Pools {
 		c.Pools[i].Enabled = true
 	}
 	for i := range c.Clients {
-		c.Clients[i].Enabled = true
+		// Enabled is changed by the dedicated lifecycle endpoint.
 		if c.Clients[i].Pool == "" {
 			c.Clients[i].Pool = c.Pools[0].ID
 		}
@@ -413,11 +458,13 @@ func (sv *Server) save(w http.ResponseWriter, r *http.Request) {
 		for i := range c.Clients {
 			if c.Clients[i].ID == previous.ID {
 				found = true
+				c.Clients[i].RestorePending = previous.RestorePending
+				c.Clients[i].Enabled = previous.Enabled
 				c.Clients[i].ClearPending = previous.ClearPending
 				c.Clients[i].StrategyEnabled = previous.StrategyEnabled
 			}
 		}
-		if previous.ClearPending && !found {
+		if (previous.ClearPending || previous.RestorePending) && !found {
 			failHTTP(w, 409, "请先完成该下载器的限速清空 / Pending downloader clearance must complete before removal")
 			return
 		}
@@ -708,7 +755,7 @@ func (sv *Server) clientPolicy(w http.ResponseWriter, r *http.Request) {
 		failHTTP(w, 404, "downloader not found")
 		return
 	}
-	if v.Enabled && (c.Clients[index].ClearPending || c.ClearPending) {
+	if v.Enabled && (!c.Clients[index].Enabled || c.Clients[index].RestorePending || c.Clients[index].ClearPending || c.ClearPending) {
 		failHTTP(w, 409, "请等待限速清空完成 / Clearance pending")
 		return
 	}

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.8 · 2026-11-20
+
+- Add bundled/daily-updated PT-depiler site recognition with manual-rule priority and retained history.
+- Reorganize navigation into five primary entries and contextual sections.
+- Add independent downloader enable/disable with durable owned-limit recovery.
+- Unify decimal units across inputs, charts, notifications and historical log display without changing stored byte values.
+- Add a bounded, paginated downloading list with qBittorrent/Transmission progress on Overview.
+
+
 ## 0.1.6
 
 - Place Webhook and backup above settings, unify Chinese menu labels, and add an About page explaining allocation, history and recovery.

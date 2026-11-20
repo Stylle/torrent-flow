@@ -9,6 +9,7 @@ import (
 )
 
 type Engine struct {
+	catalog   *SiteCatalog
 	s         *Store
 	mu        sync.Mutex
 	stateMu   sync.RWMutex
@@ -23,7 +24,7 @@ type Engine struct {
 }
 
 func newEngine(s *Store) *Engine {
-	return &Engine{s: s, idle: map[string]time.Time{}, suspended: map[string]bool{}, adapters: map[string]*Adapter{}, torrents: []Torrent{}, statuses: []ClientStatus{}}
+	return &Engine{s: s, catalog: newSiteCatalog(s), idle: map[string]time.Time{}, suspended: map[string]bool{}, adapters: map[string]*Adapter{}, torrents: []Torrent{}, statuses: []ClientStatus{}}
 }
 func (e *Engine) get(c Client) *Adapter {
 	c = normalizeClient(c)
@@ -48,6 +49,10 @@ func (e *Engine) tick(ctx context.Context) {
 	}
 	changed := false
 	for i, cl := range c.Clients {
+		if cl.RestorePending && e.restoreClient(ctx, c, cl.ID) == nil {
+			c.Clients[i].RestorePending = false
+			changed = true
+		}
 		if cl.ClearPending {
 			one := c
 			one.Clients = []Client{cl}
@@ -114,7 +119,7 @@ func (e *Engine) tick(ctx context.Context) {
 			continue
 		}
 		status.Online = true
-		if next, added := discoverSites(c, items); added > 0 {
+		if next, added := discoverSitesWithCatalog(c, items, e.catalog.index()); added > 0 {
 			next.Revision++
 			if next.validate() == nil && e.s.saveConfig(next) == nil {
 				c = next
@@ -267,7 +272,7 @@ func (e *Engine) tick(ctx context.Context) {
 		effectiveBudget, _ := pool.effectiveBudget(now)
 		siteBudgets, exceeded := allocateSiteShares(effectiveBudget, siteItems, floors)
 		if exceeded {
-			warnings = append(warnings, fmt.Sprintf("出口 %s：最低额度合计 %d KB/s，超过预算 %d KB/s；最低额度保持不变 / Minimum allowances exceed outlet budget", pool.Name, totalFloor/1000, effectiveBudget/1000))
+			warnings = append(warnings, fmt.Sprintf("出口 %s：最低额度合计 %s，超过预算 %s；最低额度保持不变 / Minimum allowances exceed outlet budget", pool.Name, formatBytes(totalFloor, true), formatBytes(effectiveBudget, true)))
 		}
 		for site, ts := range groups {
 			var items []Allocation
@@ -449,7 +454,7 @@ func (e *Engine) apply(ctx context.Context, cl Client, t Torrent, target int64) 
 		return fmt.Errorf("limit not confirmed")
 	}
 	tx.Exec("UPDATE leases SET last=?,state='confirmed',at=? WHERE k=?", target, time.Now().Unix(), t.Key)
-	event(tx, "allocated", t.Key, fmt.Sprintf("上传限速已确认 / Upload limit confirmed: %d B/s", target))
+	event(tx, "allocated", t.Key, "上传限速已确认 / Upload limit confirmed: "+formatBytes(target, true))
 	return tx.Commit()
 }
 func (e *Engine) releaseKey(ctx context.Context, c Config, key string) error {

@@ -1380,3 +1380,130 @@ td {
   margin: 0;
   font-size: 13px;
 }
+.section-tabs {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  margin: 0 0 22px;
+  padding: 4px 0 10px;
+  border-bottom: 1px solid var(--line);
+}
+.section-tabs button {
+  flex-shrink: 0;
+  white-space: nowrap;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+.section-tabs button[aria-selected="true"] {
+  background: var(--surface);
+  border-color: var(--line);
+  color: var(--teal);
+  font-weight: 600;
+}
+.catalog-status {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 12px 24px;
+  margin: 24px 0;
+  font-size: 14px;
+}
+.catalog-status dt {
+  color: var(--muted);
+}
+.catalog-status dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.client-row {
+  flex-wrap: wrap;
+}
+.client-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+@media (max-width: 700px) {
+  .client-row > .client-actions {
+    grid-column: 1/-1;
+    grid-row: 3;
+  }
+  .client-actions > small {
+    flex-basis: 100%;
+  }
+}
+input[type="checkbox"] {
+  accent-color: var(--teal);
+}
+.download-table {
+  min-width: 900px;
+  table-layout: fixed;
+  width: 100%;
+}
+.download-table th:first-child {
+  width: 250px;
+}
+.download-table th:nth-child(2) {
+  width: 120px;
+}
+.download-table th:nth-child(3) {
+  width: 145px;
+}
+.download-table td {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.download-name {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.download-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.download-progress progress {
+  width: 70px;
+  height: 6px;
+  accent-color: var(--teal);
+}
+@media (max-width: 700px) {
+  .download-table {
+    min-width: 820px;
+  }
+  .download-table th:first-child {
+    width: 170px;
+  }
+  .download-table th:nth-child(2) {
+    width: 115px;
+  }
+}
+.downloading-card .table-wrap {
+  max-height: 420px;
+  overflow: auto;
+}
+.download-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--surface);
+}
+@media (max-width: 700px) {
+  .downloading-card .table-wrap {
+    max-height: 300px;
+  }
+}
+.allocation-card .section-head > div {
+  display: flex;
+  flex-wrap: wrap;
+  width: 100%;
+}
+.allocation-card .section-head h2 {
+  flex: 1 0 160px;
+}
+.allocation-card .allocation-summary {
+  flex-basis: 100%;
+}

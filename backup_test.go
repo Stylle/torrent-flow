@@ -28,6 +28,9 @@ func TestPortableBackupRestoreAcrossKeys(t *testing.T) {
 	c.Sites = []Site{{ID: "site", Name: "Retained", Domains: []string{"a.example"}, Weight: 10, Minimum: 50000}}
 	c.Notify.Headers = `{"X-Fixture":"fixture-only"}`
 	source.saveConfig(c)
+	if err := newSiteCatalog(source).setAuto(false); err != nil {
+		t.Fatal(err)
+	}
 	source.db.Exec("INSERT INTO site_speeds VALUES(1,'site',123,4)")
 	source.db.Exec("INSERT INTO traffic(k,site,at,up,down,uncertain)VALUES('fixture:abc','site',1,12345,99,0)")
 	archive := filepath.Join(t.TempDir(), "backup.zip")
@@ -43,6 +46,9 @@ func TestPortableBackupRestoreAcrossKeys(t *testing.T) {
 	sv.backup(rec, r)
 	if rec.Code != 200 {
 		t.Fatalf("restore HTTP %d: %s", rec.Code, rec.Body.String())
+	}
+	if state := sv.e.catalog.snapshot(); state.Auto == nil || *state.Auto {
+		t.Fatal("catalog preferences not restored into live cache")
 	}
 	loaded, err := dest.config()
 	if err != nil || len(loaded.Clients) != 1 || loaded.Clients[0].Password != "fixture-only" || loaded.Clients[0].StrategyEnabled == nil || *loaded.Clients[0].StrategyEnabled {

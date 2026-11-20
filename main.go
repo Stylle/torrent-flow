@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"log"
 	"net/http"
@@ -15,7 +16,21 @@ import (
 func main() {
 	guardian := flag.Bool("guardian", false, "Run independent recovery guardian")
 	guardianHealth := flag.Bool("guardian-health", false, "Check guardian heartbeat")
+	exportCatalog := flag.String("export-site-catalog", "", "Export current upstream catalog as JSON without opening application data")
 	flag.Parse()
+	if *exportCatalog != "" {
+		state, err := fetchCatalog(context.Background(), &http.Client{Timeout: 60 * time.Second}, "")
+		if err != nil {
+			log.Fatal(err)
+		}
+		state.Updated = time.Now().Unix()
+		raw, _ := json.MarshalIndent(state, "", "  ")
+		if err = os.WriteFile(*exportCatalog, raw, 0644); err != nil {
+			log.Fatal(err)
+		}
+		log.Printf("Exported %d public site definitions", len(state.Entries))
+		return
+	}
 	dir := os.Getenv("DATA_DIR")
 	if dir == "" {
 		dir = "data"
@@ -48,6 +63,7 @@ func main() {
 	}
 	sv := &Server{e: e, s: s, attempts: map[string][]time.Time{}}
 	go sv.notifications(ctx)
+	go e.catalog.run(ctx)
 	addr := os.Getenv("LISTEN_ADDR")
 	if addr == "" {
 		addr = ":8080"

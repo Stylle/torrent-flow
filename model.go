@@ -10,9 +10,10 @@ import (
 	"time"
 )
 
-const Version = "0.1.7"
+const Version = "0.1.8"
 
 type Client struct {
+	RestorePending  bool   `json:"restorePending"`
 	StrategyEnabled *bool  `json:"strategyEnabled"`
 	ClearPending    bool   `json:"clearPending"`
 	AutoManage      bool   `json:"autoManage,omitempty"`
@@ -26,6 +27,7 @@ type Client struct {
 	Enabled         bool   `json:"enabled"`
 }
 type Site struct {
+	CatalogID   string   `json:"catalogId,omitempty"`
 	Automatic   bool     `json:"automatic,omitempty"`
 	ID          string   `json:"id"`
 	Name        string   `json:"name"`
@@ -73,6 +75,8 @@ func defaultConfig() Config {
 }
 
 type Torrent struct {
+	Downloading bool     `json:"downloading"`
+	Progress    *float64 `json:"progress,omitempty"`
 	Key         string   `json:"key"`
 	Client      string   `json:"client"`
 	Hash        string   `json:"hash"`

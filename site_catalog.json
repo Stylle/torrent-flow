@@ -1,0 +1,2734 @@
+{
+  "version": "7817b40695537d0377b0640bbfe4bf0f991b98f8",
+  "checked": 0,
+  "updated": 1795180862,
+  "auto": null,
+  "error": "",
+  "entries": [
+    {
+      "id": "0dayfiles",
+      "name": "0DayFiles",
+      "domains": [
+        "0dayfiles.net"
+      ]
+    },
+    {
+      "id": "0magnet",
+      "name": "0Magnet",
+      "domains": [
+        "16mag.net",
+        "0magnet.com",
+        "8ci.li",
+        "7mag.net",
+        "13mag.net",
+        "getmag.net",
+        "xcili.net",
+        "1cili.com",
+        "cili.info",
+        "cili.uk",
+        "wuji.me",
+        "0cili.com",
+        "0cili.my",
+        "6mag.net",
+        "9mag.net",
+        "0mag.net"
+      ]
+    },
+    {
+      "id": "1337x",
+      "name": "1337x",
+      "domains": [
+        "1337x.to",
+        "1337x.st",
+        "x1337x.ws",
+        "x1337x.eu",
+        "x1337x.cc",
+        "1337x.is",
+        "1337x.gd",
+        "1337x.mrunblock.bond",
+        "1337x.abcproxy.org",
+        "1337x.so",
+        "1337x.unblockit.download",
+        "1337x.unblockninja.com",
+        "1337x.ninjaproxy1.com",
+        "1337x.proxyninja.org",
+        "1337x.proxyninja.net",
+        "1337x.torrentbay.st",
+        "1337x.torrentsbay.org",
+        "x1337x.se"
+      ]
+    },
+    {
+      "id": "13city",
+      "name": "13city",
+      "domains": [
+        "13city.org",
+        "www.13city.org",
+        "13city.online"
+      ]
+    },
+    {
+      "id": "1ptba",
+      "name": "1PTBar",
+      "domains": [
+        "1ptba.com"
+      ]
+    },
+    {
+      "id": "52pt",
+      "name": "52PT",
+      "domains": [
+        "52pt.site"
+      ]
+    },
+    {
+      "id": "abtorrents",
+      "name": "ABTorrents",
+      "domains": [
+        "usefultrash.net",
+        "abtorrents.me",
+        "abtorrents.xyz"
+      ]
+    },
+    {
+      "id": "acgrip",
+      "name": "ACG.RIP",
+      "domains": [
+        "acg.rip"
+      ]
+    },
+    {
+      "id": "agsvpt",
+      "name": "AGSVPT",
+      "domains": [
+        "pt.agsvpt.cn",
+        "www.agsvpt.com",
+        "new.agsvpt.cn"
+      ]
+    },
+    {
+      "id": "aidoruonline",
+      "name": "Aidoru!Online",
+      "domains": [
+        "aidoru-online.me"
+      ]
+    },
+    {
+      "id": "aither",
+      "name": "Aither",
+      "domains": [
+        "aither.cc"
+      ]
+    },
+    {
+      "id": "alingpt",
+      "name": "alingPT",
+      "domains": [
+        "pt.aling.de"
+      ]
+    },
+    {
+      "id": "alpharatio",
+      "name": "AlphaRatio",
+      "domains": [
+        "alpharatio.cc"
+      ]
+    },
+    {
+      "id": "anibt",
+      "name": "Anibt",
+      "domains": [
+        "anibt.net"
+      ]
+    },
+    {
+      "id": "animebytes",
+      "name": "AnimeBytes",
+      "domains": [
+        "animebytes.tv"
+      ]
+    },
+    {
+      "id": "animeclipse",
+      "name": "AnimeClipse",
+      "domains": [
+        "www.animeclipse.com"
+      ]
+    },
+    {
+      "id": "animetosho",
+      "name": "AnimeTosho",
+      "domains": [
+        "animetosho.org"
+      ]
+    },
+    {
+      "id": "animez",
+      "name": "AnimeZ",
+      "domains": [
+        "animez.to"
+      ]
+    },
+    {
+      "id": "anirena",
+      "name": "AniRena",
+      "domains": [
+        "www.anirena.com",
+        "anirena.com"
+      ]
+    },
+    {
+      "id": "anisource",
+      "name": "AniSource",
+      "domains": [
+        "asnet.pw"
+      ]
+    },
+    {
+      "id": "anthelion",
+      "name": "Anthelion",
+      "domains": [
+        "anthelion.me"
+      ]
+    },
+    {
+      "id": "asiancinema",
+      "name": "AsianCinema",
+      "domains": [
+        "eiga.moi",
+        "asiancinema.me"
+      ]
+    },
+    {
+      "id": "audiences",
+      "name": "Audiences",
+      "domains": [
+        "audiences.me"
+      ]
+    },
+    {
+      "id": "audiobookbay",
+      "name": "AudioBook Bay",
+      "domains": [
+        "audiobookbay.lu",
+        "audiobookbay.is",
+        "audiobookbay.se",
+        "audiobookbay.fi",
+        "audiobookbay.ws",
+        "theaudiobookbay.se"
+      ]
+    },
+    {
+      "id": "audionews",
+      "name": "AudioNews",
+      "domains": [
+        "audionews.org"
+      ]
+    },
+    {
+      "id": "avistaz",
+      "name": "AvistaZ",
+      "domains": [
+        "avistaz.to"
+      ]
+    },
+    {
+      "id": "azusa",
+      "name": "梓喵",
+      "domains": [
+        "azusa.wiki"
+      ]
+    },
+    {
+      "id": "bakabt",
+      "name": "BakaBT",
+      "domains": [
+        "bakabt.me"
+      ]
+    },
+    {
+      "id": "bangumimoe",
+      "name": "Bangumi Moe",
+      "domains": [
+        "bangumi.moe"
+      ]
+    },
+    {
+      "id": "baozi",
+      "name": "包子",
+      "domains": [
+        "p.t-baozi.cc"
+      ]
+    },
+    {
+      "id": "bemaniso",
+      "name": "Bemaniso",
+      "domains": [
+        "bemaniso.ws"
+      ]
+    },
+    {
+      "id": "beyondhd",
+      "name": "BeyondHD",
+      "domains": [
+        "beyond-hd.me"
+      ]
+    },
+    {
+      "id": "bibliotik",
+      "name": "Bibliotik",
+      "domains": [
+        "bibliotik.me"
+      ]
+    },
+    {
+      "id": "bigfangroup",
+      "name": "BigFANGroup",
+      "domains": [
+        "bigfangroup.org",
+        "www.freebfg.org"
+      ]
+    },
+    {
+      "id": "bitporn",
+      "name": "BitPorn",
+      "domains": [
+        "bitporn.eu"
+      ]
+    },
+    {
+      "id": "bitpt",
+      "name": "极速之星",
+      "domains": [
+        "bitpt.cn"
+      ]
+    },
+    {
+      "id": "blueroms",
+      "name": "BlueRoms",
+      "domains": [
+        "www.blueroms.ws"
+      ]
+    },
+    {
+      "id": "blutopia",
+      "name": "Blutopia",
+      "domains": [
+        "blutopia.cc",
+        "blutopia.xyz"
+      ]
+    },
+    {
+      "id": "broadcasthenet",
+      "name": "BroadcastTheNet",
+      "domains": [
+        "broadcasthe.net"
+      ]
+    },
+    {
+      "id": "brokenstones",
+      "name": "BrokenStones",
+      "domains": [
+        "brokenstones.is"
+      ]
+    },
+    {
+      "id": "btetree",
+      "name": "BT.etree",
+      "domains": [
+        "bt.etree.org"
+      ]
+    },
+    {
+      "id": "btschool",
+      "name": "BTSCHOOL",
+      "domains": [
+        "pt.btschool.club",
+        "pt.btschool.net"
+      ]
+    },
+    {
+      "id": "bwtorrents",
+      "name": "BWT",
+      "domains": [
+        "bwtorrents.tv",
+        "bwtorrents.cc",
+        "bwtorrents.xyz",
+        "bwtorrents.us",
+        "bwtorrents.fun",
+        "bwtorrents.co",
+        "www.bwtorrents.life",
+        "www.bwtorrents.pro",
+        "bwtorrents.live"
+      ]
+    },
+    {
+      "id": "byrbt",
+      "name": "北邮人-BYRBT",
+      "domains": [
+        "byr.pt",
+        "bt.byr.cn"
+      ]
+    },
+    {
+      "id": "byrutor",
+      "name": "Byrutor",
+      "domains": [
+        "byrutgame.org",
+        "byrutor.org",
+        "byrutdb.org",
+        "byrut.org",
+        "thebyrut.org",
+        "byruthub.org"
+      ]
+    },
+    {
+      "id": "c411",
+      "name": "C411",
+      "domains": [
+        "c411.org",
+        "staging-68d548c5bd4.c411.org"
+      ]
+    },
+    {
+      "id": "capybarabr",
+      "name": "CapybaraBR",
+      "domains": [
+        "capybarabr.com"
+      ]
+    },
+    {
+      "id": "carpt",
+      "name": "CarPT",
+      "domains": [
+        "carpt.net"
+      ]
+    },
+    {
+      "id": "cathoderaytube",
+      "name": "Cathode-Ray.Tube",
+      "domains": [
+        "www.cathode-ray.tube"
+      ]
+    },
+    {
+      "id": "catorrent",
+      "name": "Catorrent",
+      "domains": [
+        "catorrent.net",
+        "catorrent.org"
+      ]
+    },
+    {
+      "id": "cbg",
+      "name": "藏宝阁",
+      "domains": [
+        "cangbao.ge"
+      ]
+    },
+    {
+      "id": "ceskeforum",
+      "name": "CeskeForum",
+      "domains": [
+        "t.ceskeforum.com"
+      ]
+    },
+    {
+      "id": "cgpeers",
+      "name": "CGPeers",
+      "domains": [
+        "cgpeers.to",
+        "www.cgpeers.com"
+      ]
+    },
+    {
+      "id": "chdbits",
+      "name": "CHDBits",
+      "domains": [
+        "ptchdbits.co",
+        "chdbits.co"
+      ]
+    },
+    {
+      "id": "cinemageddon",
+      "name": "Cinemageddon",
+      "domains": [
+        "cinemageddon.net"
+      ]
+    },
+    {
+      "id": "cinematik",
+      "name": "Cinematik",
+      "domains": [
+        "cinematik.net"
+      ]
+    },
+    {
+      "id": "cinemaz",
+      "name": "CinemaZ",
+      "domains": [
+        "cinemaz.to"
+      ]
+    },
+    {
+      "id": "clearjav",
+      "name": "ClearJAV",
+      "domains": [
+        "clearjav.com"
+      ]
+    },
+    {
+      "id": "colapt",
+      "name": "可乐",
+      "domains": [
+        "www.colapt.com"
+      ]
+    },
+    {
+      "id": "concertos",
+      "name": "Concertos",
+      "domains": [
+        "concertos.live"
+      ]
+    },
+    {
+      "id": "crabpt",
+      "name": "CrabPt",
+      "domains": [
+        "crabpt.vip"
+      ]
+    },
+    {
+      "id": "crackingpatching",
+      "name": "CrackingPatching",
+      "domains": [
+        "crackingpatching.com"
+      ]
+    },
+    {
+      "id": "cspt",
+      "name": "财神",
+      "domains": [
+        "cspt.top",
+        "cspt.cc",
+        "cspt.date"
+      ]
+    },
+    {
+      "id": "cyanbug",
+      "name": "CyanBug",
+      "domains": [
+        "cyanbug.net"
+      ]
+    },
+    {
+      "id": "dabaojian",
+      "name": "大宝剑",
+      "domains": [
+        "pt.525968.xyz"
+      ]
+    },
+    {
+      "id": "damagnet",
+      "name": "DaMagNet",
+      "domains": [
+        "damag.net"
+      ]
+    },
+    {
+      "id": "danishbytes",
+      "name": "DanishBytes",
+      "domains": [
+        "danishbytes.club",
+        "danishbytes2.org"
+      ]
+    },
+    {
+      "id": "darkland",
+      "name": "Darkland",
+      "domains": [
+        "darkland.top"
+      ]
+    },
+    {
+      "id": "darkpeers",
+      "name": "darkpeers",
+      "domains": [
+        "darkpeers.org"
+      ]
+    },
+    {
+      "id": "datascene",
+      "name": "DataScene",
+      "domains": [
+        "datascene.xyz",
+        "datascene.net"
+      ]
+    },
+    {
+      "id": "daxiangjiao",
+      "name": "DaXiangJiao",
+      "domains": [
+        "pt.daxiangjiao.org"
+      ]
+    },
+    {
+      "id": "desigaane",
+      "name": "DesiGaane",
+      "domains": [
+        "desigaane.rocks"
+      ]
+    },
+    {
+      "id": "desitorrents",
+      "name": "DesiTorrents",
+      "domains": [
+        "torrent.desi",
+        "desitorrents.tv",
+        "desitorrents.rocks"
+      ]
+    },
+    {
+      "id": "dicmusic",
+      "name": "DICMusic",
+      "domains": [
+        "dicmusic.com",
+        "dicmusic.club"
+      ]
+    },
+    {
+      "id": "digitalcore",
+      "name": "DigitalCore",
+      "domains": [
+        "digitalcore.club"
+      ]
+    },
+    {
+      "id": "dirtybytes",
+      "name": "DirtyBytes",
+      "domains": [
+        "dirtybytes.net"
+      ]
+    },
+    {
+      "id": "discfan",
+      "name": "DiscFan",
+      "domains": [
+        "discfan.net",
+        "pt.gztown.net"
+      ]
+    },
+    {
+      "id": "dmhy",
+      "name": "動漫花園資源網",
+      "domains": [
+        "share.dmhy.org"
+      ]
+    },
+    {
+      "id": "dragonhd",
+      "name": "龍之家",
+      "domains": [
+        "www.dragonhd.xyz",
+        "dragonhd.xyz"
+      ]
+    },
+    {
+      "id": "dreadvault",
+      "name": "DreadVault",
+      "domains": [
+        "dreadvault.org"
+      ]
+    },
+    {
+      "id": "dstudio",
+      "name": "Depth Studio",
+      "domains": [
+        "dstudio.me"
+      ]
+    },
+    {
+      "id": "dubhe",
+      "name": "天枢",
+      "domains": [
+        "dubhe.site"
+      ]
+    },
+    {
+      "id": "ehentai",
+      "name": "E-Hentai",
+      "domains": [
+        "e-hentai.org",
+        "exhentai.org"
+      ]
+    },
+    {
+      "id": "empornium",
+      "name": "Empornium",
+      "domains": [
+        "emparadise.rs",
+        "www.empornium.sx",
+        "www.empornium.is",
+        "www.empornium.me",
+        "www.empornium.rs"
+      ]
+    },
+    {
+      "id": "emuwarez",
+      "name": "eMuwarez",
+      "domains": [
+        "emu-warez.com",
+        "emuwarez.com",
+        "emuwarez.it"
+      ]
+    },
+    {
+      "id": "exoticaz",
+      "name": "ExoticaZ",
+      "domains": [
+        "exoticaz.to",
+        "torrents.yourexotic.com"
+      ]
+    },
+    {
+      "id": "exttorrents",
+      "name": "EXT Torrents",
+      "domains": [
+        "ext.to",
+        "search.extto.com",
+        "extranet.torrentbay.st"
+      ]
+    },
+    {
+      "id": "eztv",
+      "name": "EZTV",
+      "domains": [
+        "eztvx.to",
+        "eztv.wf",
+        "eztv.tf",
+        "eztv.yt",
+        "eztv1.xyz",
+        "eztv.ag",
+        "eztv.it",
+        "eztv.ch",
+        "eztv.io",
+        "eztv.re",
+        "eztv.li",
+        "eztv.nocensor.cloud",
+        "eztv.ninjaproxy1.com",
+        "eztv.proxyninja.org",
+        "eztv.abcproxy.org",
+        "eztv.unblockit.download"
+      ]
+    },
+    {
+      "id": "fappaizuri",
+      "name": "Fappaizuri",
+      "domains": [
+        "www.fappaizuri.me",
+        "fappaizuri.me"
+      ]
+    },
+    {
+      "id": "femdomcult",
+      "name": "Femdomcult",
+      "domains": [
+        "femdomcult.org"
+      ]
+    },
+    {
+      "id": "fhpt",
+      "name": "凤凰PT",
+      "domains": [
+        "pt.521.best"
+      ]
+    },
+    {
+      "id": "filelist",
+      "name": "FileList",
+      "domains": [
+        "filelist.io",
+        "flro.org"
+      ]
+    },
+    {
+      "id": "filemood",
+      "name": "FileMood",
+      "domains": [
+        "filemood.com"
+      ]
+    },
+    {
+      "id": "freefarm",
+      "name": "自由农场",
+      "domains": [
+        "tracker.0ff.cc",
+        "pt.0ff.cc"
+      ]
+    },
+    {
+      "id": "freejavtorrent",
+      "name": "Free JAV Torrent",
+      "domains": [
+        "www.freejavtorrent.com"
+      ]
+    },
+    {
+      "id": "gazellegames",
+      "name": "GazelleGames",
+      "domains": [
+        "gazellegames.net"
+      ]
+    },
+    {
+      "id": "geminitracker",
+      "name": "GeminiTracker",
+      "domains": [
+        "gemini-tracker.org"
+      ]
+    },
+    {
+      "id": "generationfree",
+      "name": "Generation-Free",
+      "domains": [
+        "generation-free.org",
+        "generation-free.biz"
+      ]
+    },
+    {
+      "id": "ggpt",
+      "name": "GGPT",
+      "domains": [
+        "www.gamegamept.com"
+      ]
+    },
+    {
+      "id": "greatposterwall",
+      "name": "GreatPosterWall",
+      "domains": [
+        "greatposterwall.com"
+      ]
+    },
+    {
+      "id": "gtnet",
+      "name": "Gay-Torrents.net",
+      "domains": [
+        "www.gay-torrents.net"
+      ]
+    },
+    {
+      "id": "gtru",
+      "name": "GayTorrent.ru",
+      "domains": [
+        "www.gaytor.rent",
+        "www.gaytorrent.ru"
+      ]
+    },
+    {
+      "id": "haidan",
+      "name": "海胆",
+      "domains": [
+        "www.haidan.cc",
+        "www.haidan.video"
+      ]
+    },
+    {
+      "id": "happyfappy",
+      "name": "HappyFappy",
+      "domains": [
+        "www.happyfappy.net",
+        "happyfappy.net",
+        "www.happyfappy.org"
+      ]
+    },
+    {
+      "id": "hdarea",
+      "name": "HDArea",
+      "domains": [
+        "hdarea.club",
+        "www.hdarea.co"
+      ]
+    },
+    {
+      "id": "hdbao",
+      "name": "HDBao",
+      "domains": [
+        "hdbao.cc"
+      ]
+    },
+    {
+      "id": "hdbits",
+      "name": "HDBits",
+      "domains": [
+        "hdbits.org"
+      ]
+    },
+    {
+      "id": "hdchina",
+      "name": "HDChina",
+      "domains": [
+        "hdwing.org",
+        "hdchina.org",
+        "hdchina.club"
+      ]
+    },
+    {
+      "id": "hdcity",
+      "name": "HDCity",
+      "domains": [
+        "hdcity.city",
+        "hdcity.leniter.org",
+        "hdcity.work",
+        "hdcity.top"
+      ]
+    },
+    {
+      "id": "hdclone",
+      "name": "HDClone",
+      "domains": [
+        "pt.hdclone.top",
+        "pt.hdclone.org"
+      ]
+    },
+    {
+      "id": "hddolby",
+      "name": "UHDDolby",
+      "domains": [
+        "www.uhddolby.com",
+        "hddolby.com",
+        "www.hddolby.com"
+      ]
+    },
+    {
+      "id": "hdf",
+      "name": "HD-Forever",
+      "domains": [
+        "hdf.world"
+      ]
+    },
+    {
+      "id": "hdfans",
+      "name": "HDFans",
+      "domains": [
+        "hdfans.org"
+      ]
+    },
+    {
+      "id": "hdhome",
+      "name": "HDHome",
+      "domains": [
+        "hdhome.org"
+      ]
+    },
+    {
+      "id": "hdkylin",
+      "name": "HDKylin",
+      "domains": [
+        "www.hdkyl.in",
+        "na.hdkylin.com",
+        "cf.hdkylin.com"
+      ]
+    },
+    {
+      "id": "hdroute",
+      "name": "HDRoute",
+      "domains": [
+        "hdroute.org"
+      ]
+    },
+    {
+      "id": "hdsky",
+      "name": "HDSky",
+      "domains": [
+        "hdsky.me"
+      ]
+    },
+    {
+      "id": "hdspace",
+      "name": "HD-Space",
+      "domains": [
+        "hd-space.org"
+      ]
+    },
+    {
+      "id": "hdtime",
+      "name": "HDTime",
+      "domains": [
+        "hdtime.org"
+      ]
+    },
+    {
+      "id": "hdtorrents",
+      "name": "HD-Torrents",
+      "domains": [
+        "hd-torrents.org",
+        "hd-torrents.net",
+        "hd-torrents.me",
+        "hdts.ru"
+      ]
+    },
+    {
+      "id": "hdunited",
+      "name": "HD-UNiT3D",
+      "domains": [
+        "hd-united.vn"
+      ]
+    },
+    {
+      "id": "hdupt",
+      "name": "HDU",
+      "domains": [
+        "pt.hdupt.com",
+        "pt.upxin.net"
+      ]
+    },
+    {
+      "id": "hdvideo",
+      "name": "HDVideo",
+      "domains": [
+        "hdvideo.top",
+        "hdvideo.one"
+      ]
+    },
+    {
+      "id": "hellenichd",
+      "name": "HELLENIC-HD",
+      "domains": [
+        "hellenic-hd.cc"
+      ]
+    },
+    {
+      "id": "hhanclub",
+      "name": "憨憨",
+      "domains": [
+        "hhanclub.net",
+        "hhanclub.top"
+      ]
+    },
+    {
+      "id": "hitpt",
+      "name": "百川PT",
+      "domains": [
+        "www.hitpt.com",
+        "pt.ghtt.net"
+      ]
+    },
+    {
+      "id": "homiehelpdesk",
+      "name": "HomieHelpdesk",
+      "domains": [
+        "homiehelpdesk.net"
+      ]
+    },
+    {
+      "id": "hqmusic",
+      "name": "HQMusic",
+      "domains": [
+        "tracker.hqmusic.info"
+      ]
+    },
+    {
+      "id": "htpt",
+      "name": "海棠PT",
+      "domains": [
+        "www.htpt.cc",
+        "htpt.cc"
+      ]
+    },
+    {
+      "id": "hudbt",
+      "name": "蝴蝶-HUDBT",
+      "domains": [
+        "hudbt.hust.edu.cn"
+      ]
+    },
+    {
+      "id": "huno",
+      "name": "HUNO",
+      "domains": [
+        "hawke.uno"
+      ]
+    },
+    {
+      "id": "hxpt",
+      "name": "好学",
+      "domains": [
+        "www.hxpt.org"
+      ]
+    },
+    {
+      "id": "ilolicon",
+      "name": "ilolicon",
+      "domains": [
+        "mua.xloli.cc",
+        "share.ilolicon.com"
+      ]
+    },
+    {
+      "id": "infinityhd",
+      "name": "InfinityHD",
+      "domains": [
+        "infinityhd.net"
+      ]
+    },
+    {
+      "id": "internetarchive",
+      "name": "Internet Archive",
+      "domains": [
+        "archive.org"
+      ]
+    },
+    {
+      "id": "iptorrents",
+      "name": "IPTorrents",
+      "domains": [
+        "iptorrents.com"
+      ]
+    },
+    {
+      "id": "itzmx",
+      "name": "PT分享站",
+      "domains": [
+        "pt.itzmx.com"
+      ]
+    },
+    {
+      "id": "jpopsuki",
+      "name": "JPopSuki",
+      "domains": [
+        "jpopsuki.eu"
+      ]
+    },
+    {
+      "id": "jptv4us",
+      "name": "JPTV4us",
+      "domains": [
+        "jptv4.us"
+      ]
+    },
+    {
+      "id": "kamept",
+      "name": "KamePT",
+      "domains": [
+        "kamept.com"
+      ]
+    },
+    {
+      "id": "karagarga",
+      "name": "KaraGarga",
+      "domains": [
+        "karagarga.in"
+      ]
+    },
+    {
+      "id": "keepfrds",
+      "name": "PT@KEEPFRDS",
+      "domains": [
+        "pt.keepfrds.com"
+      ]
+    },
+    {
+      "id": "kelu",
+      "name": "Kelu",
+      "domains": [
+        "our.kelu.one"
+      ]
+    },
+    {
+      "id": "kickasstorrentsto",
+      "name": "kickasstorrents.to",
+      "domains": [
+        "kickass.torrentbay.st",
+        "kickass.torrentsbay.org",
+        "kickasstorrents.proxyninja.org",
+        "kickasstorrents.ninjaproxy1.com",
+        "kat.root.yt",
+        "kickasstorrents.abcproxy.org",
+        "kickasstorrents.to",
+        "kickasstorrent.cr",
+        "katcr.to",
+        "www.kickasstorrents.do",
+        "kickasstorrents.unblockninja.com",
+        "kickasstorrents.proxyninja.net"
+      ]
+    },
+    {
+      "id": "kickasstorrentsws",
+      "name": "kickasstorrents.ws",
+      "domains": [
+        "kickasstorrents.bz",
+        "kkickass.com",
+        "kkat.net",
+        "kick4ss.com",
+        "kickasst.net",
+        "kickasstorrents.id",
+        "thekat.cc",
+        "kattracker.com",
+        "kickass.ws",
+        "kickass.gg",
+        "katcr.io",
+        "thekat.nz",
+        "thekat.se",
+        "kat.how",
+        "kat.li",
+        "kickass-kat.com",
+        "kickass.sh",
+        "kickasshydra.dev"
+      ]
+    },
+    {
+      "id": "kufei",
+      "name": "库非",
+      "domains": [
+        "kufei.org"
+      ]
+    },
+    {
+      "id": "kufirc",
+      "name": "kufirc",
+      "domains": [
+        "kufirc.com"
+      ]
+    },
+    {
+      "id": "lajidui",
+      "name": "lajidui",
+      "domains": [
+        "pt.lajidui.top"
+      ]
+    },
+    {
+      "id": "latteam",
+      "name": "LAT-Team",
+      "domains": [
+        "lat-team.com"
+      ]
+    },
+    {
+      "id": "learnflakes",
+      "name": "LearnFlakes",
+      "domains": [
+        "learnflakes.net"
+      ]
+    },
+    {
+      "id": "lemonhdnet",
+      "name": "柠檬不甜",
+      "domains": [
+        "lemonhd.net"
+      ]
+    },
+    {
+      "id": "limetorrents",
+      "name": "LimeTorrents",
+      "domains": [
+        "www.limetorrents.fun",
+        "limetorrents.torrentbay.st",
+        "limetorrents.torrentsbay.org",
+        "www.limetorrents.lol",
+        "limetorrents.ninjaproxy1.com",
+        "limetorrents.proxyninja.org",
+        "limetorrents.proxyninja.net",
+        "limetorrents.unblockninja.com",
+        "limetorrents.mrunblock.bond",
+        "limetorrents.nocensor.cloud",
+        "limetorrents.abcproxy.org",
+        "limetorrents.unblockit.download"
+      ]
+    },
+    {
+      "id": "linuxtracker",
+      "name": "LinuxTracker",
+      "domains": [
+        "linuxtracker.org"
+      ]
+    },
+    {
+      "id": "longpt",
+      "name": "LongPT",
+      "domains": [
+        "longpt.org",
+        "wiiii.dpdns.org"
+      ]
+    },
+    {
+      "id": "losslessclub",
+      "name": "LosslessClub",
+      "domains": [
+        "losslessclub.com"
+      ]
+    },
+    {
+      "id": "lpbits",
+      "name": "LP-Bits",
+      "domains": [
+        "lp-bits.com"
+      ]
+    },
+    {
+      "id": "lst",
+      "name": "LST",
+      "domains": [
+        "lst.gg"
+      ]
+    },
+    {
+      "id": "luckpt",
+      "name": "LuckPT",
+      "domains": [
+        "pt.luckpt.de"
+      ]
+    },
+    {
+      "id": "luminarr",
+      "name": "Luminarr",
+      "domains": [
+        "luminarr.me"
+      ]
+    },
+    {
+      "id": "lztr",
+      "name": "LzTr",
+      "domains": [
+        "lztr.me"
+      ]
+    },
+    {
+      "id": "mactorrentsdownload",
+      "name": "Mac Torrents Download",
+      "domains": [
+        "www.torrentmac.net"
+      ]
+    },
+    {
+      "id": "magnetdownload",
+      "name": "MagnetDownload",
+      "domains": [
+        "www.magnetdownload.com"
+      ]
+    },
+    {
+      "id": "magnetz",
+      "name": "Magnetz",
+      "domains": [
+        "magnetz.eu"
+      ]
+    },
+    {
+      "id": "march",
+      "name": "March-Media",
+      "domains": [
+        "duckboobee.org",
+        "marchcms.org"
+      ]
+    },
+    {
+      "id": "megapeer",
+      "name": "MegaPeer",
+      "domains": [
+        "megapeer.vip",
+        "megapeer.ru",
+        "alt.megapeer.ru"
+      ]
+    },
+    {
+      "id": "midnightscene",
+      "name": "MidnightScene",
+      "domains": [
+        "midnightscene.cc"
+      ]
+    },
+    {
+      "id": "mikan",
+      "name": "Mikan Project",
+      "domains": [
+        "mikanani.me"
+      ]
+    },
+    {
+      "id": "milkie",
+      "name": "Milkie",
+      "domains": [
+        "milkie.cc"
+      ]
+    },
+    {
+      "id": "mixtapetorrent",
+      "name": "MixtapeTorrent",
+      "domains": [
+        "www.mixtapetorrent.com"
+      ]
+    },
+    {
+      "id": "monikadesign",
+      "name": "Monikadesign",
+      "domains": [
+        "monikadesign.uk"
+      ]
+    },
+    {
+      "id": "musopia",
+      "name": "音乐乌托邦",
+      "domains": [
+        "www.musopia.vip",
+        "pt.xzt.me"
+      ]
+    },
+    {
+      "id": "muxuege",
+      "name": "慕雪阁",
+      "domains": [
+        "pt.muxuege.org"
+      ]
+    },
+    {
+      "id": "myanonamouse",
+      "name": "MyAnonamouse",
+      "domains": [
+        "www.myanonamouse.net"
+      ]
+    },
+    {
+      "id": "mypornclub",
+      "name": "MyPornClub",
+      "domains": [
+        "myporn.club"
+      ]
+    },
+    {
+      "id": "mypt",
+      "name": "MyPT",
+      "domains": [
+        "cc.mypt.cc"
+      ]
+    },
+    {
+      "id": "myspleen",
+      "name": "MySpleen",
+      "domains": [
+        "www.myspleen.org"
+      ]
+    },
+    {
+      "id": "nanyangpt",
+      "name": "南洋PT",
+      "domains": [
+        "nanyangpt.com"
+      ]
+    },
+    {
+      "id": "ncore",
+      "name": "nCore",
+      "domains": [
+        "ncore.pro"
+      ]
+    },
+    {
+      "id": "nebulance",
+      "name": "Nebulance",
+      "domains": [
+        "nebulance.io"
+      ]
+    },
+    {
+      "id": "nekobt",
+      "name": "nekoBT",
+      "domains": [
+        "nekobt.to"
+      ]
+    },
+    {
+      "id": "newstudio",
+      "name": "NewStudio",
+      "domains": [
+        "newstudio.tv"
+      ]
+    },
+    {
+      "id": "nexushd",
+      "name": "NexusHD",
+      "domains": [
+        "v6.nexushd.org",
+        "www.nexushd.org"
+      ]
+    },
+    {
+      "id": "nicept",
+      "name": "NicePT",
+      "domains": [
+        "www.nicept.net"
+      ]
+    },
+    {
+      "id": "nipponsei",
+      "name": "Nipponsei",
+      "domains": [
+        "nipponsei.minglong.org"
+      ]
+    },
+    {
+      "id": "njtupt",
+      "name": "浦园",
+      "domains": [
+        "njtupt.top"
+      ]
+    },
+    {
+      "id": "nonameclub",
+      "name": "NoNaMe Club",
+      "domains": [
+        "nnmclub.to",
+        "nnm-club.name",
+        "nnm-club.me"
+      ]
+    },
+    {
+      "id": "nordicbytes",
+      "name": "NordicBytes",
+      "domains": [
+        "nordicbytes.org"
+      ]
+    },
+    {
+      "id": "nordicquality",
+      "name": "NordicQuality",
+      "domains": [
+        "nordicq.org"
+      ]
+    },
+    {
+      "id": "novahd",
+      "name": "NovaHD",
+      "domains": [
+        "pt.novahd.top",
+        "tracker.novahd.top"
+      ]
+    },
+    {
+      "id": "nyaa",
+      "name": "Nyaa",
+      "domains": [
+        "nyaa.si",
+        "sukebei.nyaa.si",
+        "nyaa.wiki",
+        "nyaa.mom",
+        "nyaa.media",
+        "sukebei.nyaa.mom"
+      ]
+    },
+    {
+      "id": "okpt",
+      "name": "OKPT",
+      "domains": [
+        "www.okpt.net"
+      ]
+    },
+    {
+      "id": "oldtoonsworld",
+      "name": "OldToonsWorld",
+      "domains": [
+        "oldtoons.world"
+      ]
+    },
+    {
+      "id": "onejav",
+      "name": "OneJAV",
+      "domains": [
+        "onejav.com"
+      ]
+    },
+    {
+      "id": "onlyencodes",
+      "name": "OnlyEncodes+",
+      "domains": [
+        "onlyencodes.cc"
+      ]
+    },
+    {
+      "id": "opencd",
+      "name": "OpenCD",
+      "domains": [
+        "open.cd",
+        "www.open.cd"
+      ]
+    },
+    {
+      "id": "opensharing",
+      "name": "OpenSharing",
+      "domains": [
+        "opensharing.org"
+      ]
+    },
+    {
+      "id": "orpheus",
+      "name": "Orpheus",
+      "domains": [
+        "orpheus.network"
+      ]
+    },
+    {
+      "id": "oshenpt",
+      "name": "OshenPT",
+      "domains": [
+        "www.oshen.win"
+      ]
+    },
+    {
+      "id": "ourbits",
+      "name": "OurBits",
+      "domains": [
+        "ourbits.club",
+        "www.ourbits.club",
+        "pt.ourhelp.club"
+      ]
+    },
+    {
+      "id": "pandacd",
+      "name": "PandaCD",
+      "domains": [
+        "pandacd.io"
+      ]
+    },
+    {
+      "id": "pandapt",
+      "name": "PandaPT",
+      "domains": [
+        "tracker.pandapt.net",
+        "pandapt.net"
+      ]
+    },
+    {
+      "id": "passthepopcorn",
+      "name": "PassThePopcorn",
+      "domains": [
+        "passthepopcorn.me"
+      ]
+    },
+    {
+      "id": "pctorrent",
+      "name": "PC-torrent",
+      "domains": [
+        "pc-torrents.games",
+        "pc-torrent.org",
+        "pc-torrent.pro"
+      ]
+    },
+    {
+      "id": "peergarden",
+      "name": "PeerGarden",
+      "domains": [
+        "peergarden.org"
+      ]
+    },
+    {
+      "id": "phoenixproject",
+      "name": "Phoenix Project",
+      "domains": [
+        "phoenixproject.app"
+      ]
+    },
+    {
+      "id": "piggo",
+      "name": "Piggo",
+      "domains": [
+        "tracker.piggo.me",
+        "piggo.me"
+      ]
+    },
+    {
+      "id": "pixelcove",
+      "name": "PixelCove",
+      "domains": [
+        "www.pixelcove.me"
+      ]
+    },
+    {
+      "id": "playletpt",
+      "name": "PlayLet",
+      "domains": [
+        "playlet.cc",
+        "playletpt.xyz"
+      ]
+    },
+    {
+      "id": "plugintorrent",
+      "name": "PluginTorrent",
+      "domains": [
+        "plugintorrent.com"
+      ]
+    },
+    {
+      "id": "polishtorrent",
+      "name": "PolishTorrent",
+      "domains": [
+        "polishtorrent.top"
+      ]
+    },
+    {
+      "id": "pornolab",
+      "name": "PornoLab",
+      "domains": [
+        "pornolab.net"
+      ]
+    },
+    {
+      "id": "pornotorrent",
+      "name": "PornoTorrent",
+      "domains": [
+        "pornotorrent.com.br",
+        "www.pornotorrent.eu",
+        "pornotorrent.net.br"
+      ]
+    },
+    {
+      "id": "pornrips",
+      "name": "PornRips",
+      "domains": [
+        "pornrips.to"
+      ]
+    },
+    {
+      "id": "pornxlab",
+      "name": "PornXLab",
+      "domains": [
+        "www.pornxlab.com",
+        "www.ptorrents.com"
+      ]
+    },
+    {
+      "id": "portugas",
+      "name": "Portugas",
+      "domains": [
+        "portugas.org"
+      ]
+    },
+    {
+      "id": "privatehd",
+      "name": "PrivateHD",
+      "domains": [
+        "privatehd.to"
+      ]
+    },
+    {
+      "id": "ptcafe",
+      "name": "咖啡",
+      "domains": [
+        "ptcafe.club"
+      ]
+    },
+    {
+      "id": "pter",
+      "name": "PTer",
+      "domains": [
+        "pterclub.net",
+        "pter.club",
+        "pterclub.com"
+      ]
+    },
+    {
+      "id": "ptfans",
+      "name": "PTFans",
+      "domains": [
+        "ptfans.cc",
+        "cusat.win"
+      ]
+    },
+    {
+      "id": "ptgtk",
+      "name": "PT GTK",
+      "domains": [
+        "pt.gtkpw.xyz",
+        "pt.gtk.pw"
+      ]
+    },
+    {
+      "id": "pthome",
+      "name": "PTHome",
+      "domains": [
+        "pthome.net"
+      ]
+    },
+    {
+      "id": "ptlgs",
+      "name": "PTLGS",
+      "domains": [
+        "ptlgs.org"
+      ]
+    },
+    {
+      "id": "ptneko",
+      "name": "超科学PT喵",
+      "domains": [
+        "ptneko.com"
+      ]
+    },
+    {
+      "id": "ptsbao",
+      "name": "PTSBao",
+      "domains": [
+        "ptsbao.club"
+      ]
+    },
+    {
+      "id": "ptskit",
+      "name": "PTSkit",
+      "domains": [
+        "www.ptskit.com",
+        "www.ptskit.org",
+        "www.ptskit.net"
+      ]
+    },
+    {
+      "id": "pttime",
+      "name": "PTTime",
+      "domains": [
+        "www.pttime.org"
+      ]
+    },
+    {
+      "id": "ptzone",
+      "name": "PTzone",
+      "domains": [
+        "ptzone.xyz"
+      ]
+    },
+    {
+      "id": "pussytorrents",
+      "name": "Pussytorrents",
+      "domains": [
+        "pussytorrents.org"
+      ]
+    },
+    {
+      "id": "qingwa",
+      "name": "QingWa",
+      "domains": [
+        "www.qingwapt.com",
+        "www.qingwapt.org",
+        "www.qingwa.pro",
+        "qingwapt.com"
+      ]
+    },
+    {
+      "id": "racing4everyone",
+      "name": "Racing4Everyone",
+      "domains": [
+        "racing4everyone.eu"
+      ]
+    },
+    {
+      "id": "railgunpt",
+      "name": "RailgunPT",
+      "domains": [
+        "bilibili.download"
+      ]
+    },
+    {
+      "id": "rastastugan",
+      "name": "Rastastugan",
+      "domains": [
+        "rastastugan.org"
+      ]
+    },
+    {
+      "id": "redacted",
+      "name": "Redacted",
+      "domains": [
+        "redacted.sh",
+        "redacted.ch"
+      ]
+    },
+    {
+      "id": "reelflix",
+      "name": "ReelFliX",
+      "domains": [
+        "reelflix.cc",
+        "reelflix.xyz"
+      ]
+    },
+    {
+      "id": "retroflix",
+      "name": "RetroFlix",
+      "domains": [
+        "retroflix.net",
+        "retroflix.club"
+      ]
+    },
+    {
+      "id": "retromoviesclub",
+      "name": "RetroMoviesClub",
+      "domains": [
+        "retro-movies.club"
+      ]
+    },
+    {
+      "id": "retrotoon",
+      "name": "RetroToon World",
+      "domains": [
+        "retrotoon.world"
+      ]
+    },
+    {
+      "id": "rintornet",
+      "name": "RinTor.NeT",
+      "domains": [
+        "www.rintor.net",
+        "rintor.net"
+      ]
+    },
+    {
+      "id": "rockethd",
+      "name": "RocketHD",
+      "domains": [
+        "rocket-hd.cc"
+      ]
+    },
+    {
+      "id": "rousipro",
+      "name": "Rousi Pro",
+      "domains": [
+        "rousi.pro"
+      ]
+    },
+    {
+      "id": "rs",
+      "name": "睿思",
+      "domains": [
+        "resource.xidian.edu.cn"
+      ]
+    },
+    {
+      "id": "rutor",
+      "name": "RuTor",
+      "domains": [
+        "rutor.info",
+        "rutor.is",
+        "6tor.org"
+      ]
+    },
+    {
+      "id": "rutracker",
+      "name": "RuTracker.org",
+      "domains": [
+        "rutracker.org",
+        "rutracker.net",
+        "rutracker.nl"
+      ]
+    },
+    {
+      "id": "rutrackerru",
+      "name": "RuTracker.RU",
+      "domains": [
+        "rutracker.ru"
+      ]
+    },
+    {
+      "id": "sbpt",
+      "name": "SBPT",
+      "domains": [
+        "sbpt.link"
+      ]
+    },
+    {
+      "id": "secretcinema",
+      "name": "Secret Cinema",
+      "domains": [
+        "secret-cinema.pw"
+      ]
+    },
+    {
+      "id": "seedcore",
+      "name": "SeedCore",
+      "domains": [
+        "seedcore.net",
+        "rotorrent.info"
+      ]
+    },
+    {
+      "id": "seedpool",
+      "name": "seedpool",
+      "domains": [
+        "seedpool.org"
+      ]
+    },
+    {
+      "id": "sewerpt",
+      "name": "下水道",
+      "domains": [
+        "sewerpt.com"
+      ]
+    },
+    {
+      "id": "sexypics",
+      "name": "Sexy-Pics",
+      "domains": [
+        "www.sexy-pics.us"
+      ]
+    },
+    {
+      "id": "shanaproject",
+      "name": "Shana Project",
+      "domains": [
+        "www.shanaproject.com"
+      ]
+    },
+    {
+      "id": "shareisland",
+      "name": "ShareIsland",
+      "domains": [
+        "shareisland.org"
+      ]
+    },
+    {
+      "id": "showrss",
+      "name": "showRSS",
+      "domains": [
+        "showrss.info"
+      ]
+    },
+    {
+      "id": "simurg",
+      "name": "Simurg",
+      "domains": [
+        "simurg.world"
+      ]
+    },
+    {
+      "id": "siqi",
+      "name": "思齐",
+      "domains": [
+        "si-qi.xyz"
+      ]
+    },
+    {
+      "id": "sjtu",
+      "name": "葡萄",
+      "domains": [
+        "pt.sjtu.edu.cn"
+      ]
+    },
+    {
+      "id": "skidrowrepack",
+      "name": "SkidrowRepack",
+      "domains": [
+        "skidrowrepack.com"
+      ]
+    },
+    {
+      "id": "skipthecommercials",
+      "name": "SkipTheCommercials",
+      "domains": [
+        "skipthecommercials.xyz"
+      ]
+    },
+    {
+      "id": "skyeysnow",
+      "name": "SkyeySnow",
+      "domains": [
+        "www.skyey2.com",
+        "skyeysnow.com"
+      ]
+    },
+    {
+      "id": "sosulki",
+      "name": "sosulki",
+      "domains": [
+        "sosulki.bosk.cc",
+        "sosulki.net",
+        "sosulki.com",
+        "sosulki.hlom.ru"
+      ]
+    },
+    {
+      "id": "soulvoice",
+      "name": "SoulVoice",
+      "domains": [
+        "pt.soulvoice.club"
+      ]
+    },
+    {
+      "id": "speedapp",
+      "name": "SpeedApp",
+      "domains": [
+        "speedapp.io",
+        "icetorrent.org",
+        "scenefz.me",
+        "u-torrents.ro",
+        "myxz.eu"
+      ]
+    },
+    {
+      "id": "sportscult",
+      "name": "SportsCult",
+      "domains": [
+        "sportscult.org"
+      ]
+    },
+    {
+      "id": "springsunday",
+      "name": "SpringSunday",
+      "domains": [
+        "springsunday.net",
+        "hdcmct.org"
+      ]
+    },
+    {
+      "id": "starspace",
+      "name": "星空",
+      "domains": [
+        "star-space.net",
+        "shadowflow.org"
+      ]
+    },
+    {
+      "id": "sunnypt",
+      "name": "Sunny",
+      "domains": [
+        "sunnypt.top"
+      ]
+    },
+    {
+      "id": "superbits",
+      "name": "Superbits",
+      "domains": [
+        "superbits.org"
+      ]
+    },
+    {
+      "id": "tangpt",
+      "name": "躺平",
+      "domains": [
+        "www.tangpt.top"
+      ]
+    },
+    {
+      "id": "tccf",
+      "name": "TorrentCCF",
+      "domains": [
+        "et8.org"
+      ]
+    },
+    {
+      "id": "teamhd",
+      "name": "TeamHD",
+      "domains": [
+        "teamhd.org"
+      ]
+    },
+    {
+      "id": "tey",
+      "name": "tey",
+      "domains": [
+        "pt.tey.cc"
+      ]
+    },
+    {
+      "id": "thegeeks",
+      "name": "TheGeeks",
+      "domains": [
+        "thegeeks.click"
+      ]
+    },
+    {
+      "id": "thepiratebay",
+      "name": "The Pirate Bay",
+      "domains": [
+        "thepiratebay.org",
+        "thepiratebay.ninjaproxy1.com",
+        "tpb.proxyninja.org",
+        "thepiratebay.torrentbay.st",
+        "thehiddenbay.com",
+        "tpb.party",
+        "thepiratebay10.xyz",
+        "tpb.surf",
+        "tpb.monster",
+        "thepiratebay.host",
+        "piratetoday.xyz",
+        "tpb.wtf",
+        "piratebayproxy.live",
+        "pirateproxy.live",
+        "ukpiratebay.org",
+        "piratebay.by",
+        "thepirateproxy.net",
+        "pirate-proxy.page",
+        "piratehaven.xyz"
+      ]
+    },
+    {
+      "id": "therarbg",
+      "name": "TheRARBG",
+      "domains": [
+        "therarbg.to",
+        "therarbg.com",
+        "t-rb.org",
+        "the.rarbg.club",
+        "trb.archivebay.online",
+        "trb.t-pb.org",
+        "trb.themirror.wiki",
+        "rarbg.ninjaproxy1.com",
+        "rarbg.proxyninja.org",
+        "rarbg.torrentbay.st"
+      ]
+    },
+    {
+      "id": "thevault",
+      "name": "TheVault",
+      "domains": [
+        "thevault.click"
+      ]
+    },
+    {
+      "id": "tjupt",
+      "name": "北洋园PT",
+      "domains": [
+        "tjupt.org",
+        "www.tjupt.org"
+      ]
+    },
+    {
+      "id": "tlfbits",
+      "name": "TLFBits",
+      "domains": [
+        "pt.eastgame.org"
+      ]
+    },
+    {
+      "id": "tlzdigital",
+      "name": "TLZ Digital",
+      "domains": [
+        "tlzdigital.com"
+      ]
+    },
+    {
+      "id": "tokyopt",
+      "name": "Tokyo",
+      "domains": [
+        "www.tokyo-manga.top",
+        "www.tokyopt.xyz"
+      ]
+    },
+    {
+      "id": "tokyotosho",
+      "name": "Tokyo Toshokan",
+      "domains": [
+        "www.tokyotosho.info",
+        "tokyo-tosho.net",
+        "tokyotosho.se"
+      ]
+    },
+    {
+      "id": "torlock",
+      "name": "Torlock",
+      "domains": [
+        "www.torlock.com",
+        "torlock.com",
+        "www.torlock2.com",
+        "www.torlock.icu",
+        "torlock.nocensor.cloud",
+        "torlock.mrunblock.bond",
+        "torlock.unblockit.download"
+      ]
+    },
+    {
+      "id": "torrent9",
+      "name": "Torrent9",
+      "domains": [
+        "www7.torrent9.to",
+        "www.torrent9.to",
+        "torrent9.to",
+        "ww2.torrent9.to",
+        "www5.torrent9.to",
+        "www6.torrent9.to",
+        "www8.torrent9.site",
+        "torrent9.li",
+        "torrent9.se",
+        "www.torrent9.gg",
+        "www.torrent9.fm"
+      ]
+    },
+    {
+      "id": "torrentday",
+      "name": "TorrentsTD",
+      "domains": [
+        "tday.love",
+        "torrentday.cool",
+        "secure.torrentday.com",
+        "classic.torrentday.com",
+        "www.torrentday.com",
+        "www.torrentday.me",
+        "torrentday.it",
+        "td.findnemo.net",
+        "td.getcrazy.me",
+        "td.workisboring.net",
+        "tday.findnemo.net",
+        "tday.getcrazy.me",
+        "tday.workisboring.net",
+        "torrentday.com",
+        "tdonline.org",
+        "torrentday.eu",
+        "td-update.com",
+        "www.torrentday.ru",
+        "www.td.af",
+        "td.venom.global",
+        "tday.venom.global"
+      ]
+    },
+    {
+      "id": "torrentgalaxyclone",
+      "name": "TorrentGalaxyClone",
+      "domains": [
+        "torrentgalaxy.online",
+        "torrentgalaxy.info",
+        "torrentgalaxy.one",
+        "torrentgalaxy.space"
+      ]
+    },
+    {
+      "id": "torrenting",
+      "name": "Torrenting",
+      "domains": [
+        "torrenting.com",
+        "torrenting.me"
+      ]
+    },
+    {
+      "id": "torrentkitty",
+      "name": "TorrentKitty",
+      "domains": [
+        "www.torrentkitty.ink",
+        "www.torrentkitty.cam",
+        "www.torrentkitty.io",
+        "www.torrentkitty.vip",
+        "www.torrentkitty.app",
+        "www.torrentkitty.red",
+        "www.torrentkitty.lol",
+        "www.torrentkitty.best",
+        "www.torrentkitty.tv",
+        "torkitty.com",
+        "www.torrentkitty.se"
+      ]
+    },
+    {
+      "id": "torrentleech",
+      "name": "TorrentLeech",
+      "domains": [
+        "www.torrentleech.org",
+        "www.torrentleech.cc",
+        "www.torrentleech.me",
+        "www.tleechreload.org",
+        "www.tlgetin.cc"
+      ]
+    },
+    {
+      "id": "torrentparadise",
+      "name": "Torrent Paradise",
+      "domains": [
+        "torrentparadise.cl",
+        "torrentparadise.org",
+        "torrentparadise.to",
+        "torrentparadise.cc",
+        "torrentparadise.la"
+      ]
+    },
+    {
+      "id": "torrentscsv",
+      "name": "Torrents-CSV",
+      "domains": [
+        "torrents-csv.com",
+        "torrents-csv.ml"
+      ]
+    },
+    {
+      "id": "torrentsome",
+      "name": "Torrentsome",
+      "domains": [
+        "torrentsome272.com",
+        "torrentsome252.com",
+        "torrentsome253.com",
+        "torrentsome254.com",
+        "torrentsome255.com",
+        "torrentsome256.com",
+        "torrentsome257.com",
+        "torrentsome258.com",
+        "torrentsome259.com",
+        "torrentsome260.com",
+        "torrentsome261.com",
+        "torrentsome262.com",
+        "torrentsome263.com",
+        "torrentsome264.com",
+        "torrentsome265.com",
+        "torrentsome266.com",
+        "torrentsome267.com",
+        "torrentsome268.com",
+        "torrentsome269.com",
+        "torrentsome270.com",
+        "torrentsome271.com"
+      ]
+    },
+    {
+      "id": "torrenttip",
+      "name": "Torrenttip",
+      "domains": [
+        "torrenttip252.top",
+        "torrenttip232.top",
+        "torrenttip233.top",
+        "torrenttip234.top",
+        "torrenttip235.top",
+        "torrenttip236.top",
+        "torrenttip237.top",
+        "torrenttip238.top",
+        "torrenttip239.top",
+        "torrenttip240.top",
+        "torrenttip241.top",
+        "torrenttip242.top",
+        "torrenttip243.top",
+        "torrenttip244.top",
+        "torrenttip245.top",
+        "torrenttip246.top",
+        "torrenttip247.top",
+        "torrenttip248.top",
+        "torrenttip249.top",
+        "torrenttip250.top",
+        "torrenttip251.top"
+      ]
+    },
+    {
+      "id": "totheglory",
+      "name": "ToTheGlory",
+      "domains": [
+        "totheglory.im"
+      ]
+    },
+    {
+      "id": "tr4ker",
+      "name": "TR4KER",
+      "domains": [
+        "tr4ker.net"
+      ]
+    },
+    {
+      "id": "trancetraffic",
+      "name": "TranceTraffic",
+      "domains": [
+        "www.trancetraffic.com"
+      ]
+    },
+    {
+      "id": "traxary",
+      "name": "Traxary",
+      "domains": [
+        "beta.traxary.com"
+      ]
+    },
+    {
+      "id": "tu88",
+      "name": "TU88",
+      "domains": [
+        "pt.tu88.men"
+      ]
+    },
+    {
+      "id": "turkseed",
+      "name": "TURKSEED",
+      "domains": [
+        "turkseed.com"
+      ]
+    },
+    {
+      "id": "tvvault",
+      "name": "TV-Vault",
+      "domains": [
+        "tv-vault.me"
+      ]
+    },
+    {
+      "id": "u2",
+      "name": "U2",
+      "domains": [
+        "daydream.dmhy.best",
+        "u2.dmhy.org"
+      ]
+    },
+    {
+      "id": "u3c3",
+      "name": "U3C3",
+      "domains": [
+        "u3c3.com",
+        "u001.25img.com",
+        "u002.25img.com",
+        "u003.25img.com",
+        "u3c3u3c3.u3c3u3c3u3c3.com",
+        "u3c3.in",
+        "a.u3c3.life",
+        "m0m0m0m.mnmnmnmnmn.com",
+        "m0m0m1m.mnmnmnmnmn.com"
+      ]
+    },
+    {
+      "id": "ubits",
+      "name": "UBits",
+      "domains": [
+        "ubits.club"
+      ]
+    },
+    {
+      "id": "uindex",
+      "name": "UIndex",
+      "domains": [
+        "uindex.org"
+      ]
+    },
+    {
+      "id": "ultrahd",
+      "name": "UltraHD",
+      "domains": [
+        "ultrahd.net"
+      ]
+    },
+    {
+      "id": "unwalled",
+      "name": "Unwalled",
+      "domains": [
+        "unwalled.cc"
+      ]
+    },
+    {
+      "id": "uploadcx",
+      "name": "ULCX",
+      "domains": [
+        "upload.cx"
+      ]
+    },
+    {
+      "id": "vclib",
+      "name": "VC-Lib",
+      "domains": [
+        "pt.vclib.online"
+      ]
+    },
+    {
+      "id": "vsthouse",
+      "name": "VSTHouse",
+      "domains": [
+        "vsthouse.ru",
+        "vsthouse.org"
+      ]
+    },
+    {
+      "id": "vstorrent",
+      "name": "VSTorrent",
+      "domains": [
+        "vstorrent.org"
+      ]
+    },
+    {
+      "id": "vsttorrents",
+      "name": "VST Torrentz",
+      "domains": [
+        "vsttorrentz.net",
+        "vsttorrents.net",
+        "looptorrent.net"
+      ]
+    },
+    {
+      "id": "wihd",
+      "name": "WiHD",
+      "domains": [
+        "world-in-hd.net"
+      ]
+    },
+    {
+      "id": "wintersakura",
+      "name": "WinterSakura",
+      "domains": [
+        "wintersakura.net"
+      ]
+    },
+    {
+      "id": "worldtorrent",
+      "name": "World-torrent",
+      "domains": [
+        "www.darkfox.ws",
+        "www.wikibox.ws",
+        "www.vidlox.ws",
+        "www.oxtorrent.ws",
+        "www.sharkibox.ws",
+        "www.worldivx.ws",
+        "www.workino.ws",
+        "www.torrent911.pw",
+        "ww4-sharkibox.officiel.cc",
+        "ww4-worldivx.officiel.cc",
+        "ww4-workino.officiel.cc",
+        "ww4-torrent911.officiel.cc",
+        "ww4-vidlox.officiel.cc",
+        "ww4-oxtorrent.officiel.cc",
+        "ww1.darkfox.run",
+        "ww1.vidlox.run",
+        "ww1.wikibox.run",
+        "ww1.sharkibox.run",
+        "ww1.oxtorrent.run",
+        "ww1-darkfox.officiel.cc",
+        "ww1-vidlox.officiel.cc",
+        "ww1.worldivx.run",
+        "ww1-wikibox.officiel.cc",
+        "ww1-sharkibox.officiel.cc",
+        "ww1.workino.run",
+        "ww1.torrent911.run",
+        "ww2-darkfox.officiel.cc",
+        "ww2-vidlox.officiel.cc",
+        "ww2-worldivx.officiel.cc",
+        "ww2-wikibox.officiel.cc",
+        "ww2-sharkibox.officiel.cc",
+        "ww2-workino.officiel.cc",
+        "ww1-oxtorrent.officiel.cc",
+        "ww2-torrent911.officiel.cc",
+        "ww3-darkfox.officiel.cc",
+        "ww3-vidlox.officiel.cc",
+        "ww3-worldivx.officiel.cc",
+        "ww3-wikibox.officiel.cc",
+        "ww3-sharkibox.officiel.cc",
+        "ww3-workino.officiel.cc",
+        "ww3-oxtorrent.officiel.cc",
+        "ww3-torrent911.officiel.cc"
+      ]
+    },
+    {
+      "id": "xdypt",
+      "name": "修道院",
+      "domains": [
+        "xdypt.vip",
+        "pt.1ctrl.cn"
+      ]
+    },
+    {
+      "id": "xingtan",
+      "name": "杏坛",
+      "domains": [
+        "xingtan.one",
+        "xinglin.one"
+      ]
+    },
+    {
+      "id": "xingwan",
+      "name": "星湾",
+      "domains": [
+        "xingwan.cc"
+      ]
+    },
+    {
+      "id": "xingyunge",
+      "name": "星陨阁",
+      "domains": [
+        "pt.xingyungept.org",
+        "pt.xingyungept.cn",
+        "xingyunge.top"
+      ]
+    },
+    {
+      "id": "xtr",
+      "name": "XTR",
+      "domains": [
+        "extremlymtorrents.ws"
+      ]
+    },
+    {
+      "id": "xxxclub",
+      "name": "XXXClub",
+      "domains": [
+        "xxxclub.to",
+        "xxxclub.cc",
+        "xxxclub.me"
+      ]
+    },
+    {
+      "id": "xxxtor",
+      "name": "xxxtor",
+      "domains": [
+        "xxxtor.com",
+        "xxxtor.org"
+      ]
+    },
+    {
+      "id": "yemapt",
+      "name": "YemaPT",
+      "domains": [
+        "www.yemapt.org"
+      ]
+    },
+    {
+      "id": "yts",
+      "name": "YTS",
+      "domains": [
+        "yts.gg",
+        "yts.mx",
+        "yts.bz",
+        "yts.am",
+        "yts.ag",
+        "yts.lt",
+        "yts.torrentbay.st",
+        "yts.torrentsbay.org",
+        "yts.ninjaproxy1.com",
+        "yts.proxyninja.org"
+      ]
+    },
+    {
+      "id": "yuscene",
+      "name": "YUSCENE",
+      "domains": [
+        "yu-scene.net"
+      ]
+    },
+    {
+      "id": "yzyy",
+      "name": "YzYY",
+      "domains": [
+        "www.yzyy.org",
+        "bbs.yzyy.asia"
+      ]
+    },
+    {
+      "id": "zamundalife",
+      "name": "Zamunda LIFE",
+      "domains": [
+        "zamunda.life",
+        "zamunda.rip"
+      ]
+    },
+    {
+      "id": "zenith",
+      "name": "Zenith",
+      "domains": [
+        "znth.cx"
+      ]
+    },
+    {
+      "id": "zhixing",
+      "name": "知行PT",
+      "domains": [
+        "pt.zhixing.bjtu.edu.cn"
+      ]
+    },
+    {
+      "id": "zhuque",
+      "name": "朱雀",
+      "domains": [
+        "zhuque.in"
+      ]
+    },
+    {
+      "id": "zmpt",
+      "name": "织梦",
+      "domains": [
+        "zmpt.cc"
+      ]
+    },
+    {
+      "id": "zrpt",
+      "name": "ZRPT",
+      "domains": [
+        "naturept.top",
+        "zrpt.cc"
+      ]
+    }
+  ]
+}

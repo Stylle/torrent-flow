@@ -29,19 +29,8 @@ import Chart from "chart.js/auto";
 import "./app.css";
 import { createID } from "./identity.js";
 import { buildSiteSeries, siteColor } from "./site-chart.js";
-const MB = 1048576,
-  GB = 1073741824;
+import { MB, GB, formatBytes as bytes, rateInput, rateBytes } from "./units.js";
 const id = createID;
-function bytes(v = 0, speed = false) {
-  if (!v) return speed ? "0 B/s" : "0 B";
-  const scale = speed ? 1000 : 1024;
-  const units = ["B", "KB", "MB", "GB", "TB"],
-    i = Math.max(
-      0,
-      Math.min(4, Math.floor(Math.log(Math.abs(v)) / Math.log(scale))),
-    );
-  return `${(v / scale ** i).toLocaleString(undefined, { maximumFractionDigits: i < 2 ? 0 : 2 })} ${units[i]}${speed ? "/s" : ""}`;
-}
 function demoData() {
   const now = Date.now() / 1000,
     sites = ["北辰站", "海湾站", "山海站"].map((name, i) => ({
@@ -61,7 +50,18 @@ function demoData() {
       afterTarget: MB,
     }));
   return {
-    version: "0.1.7",
+    version: "0.1.8",
+    catalog: {
+      sites: 329,
+      domains: 780,
+      version: "demo",
+      auto: true,
+      updated: Math.floor(now),
+    },
+    downloaderStats: [
+      { id: "qb", up: 102 * GB, down: 28 * GB },
+      { id: "tr", up: 63 * GB, down: 15 * GB },
+    ],
     start: new Date(new Date().setHours(0, 0, 0, 0)).getTime() / 1000,
     end: new Date(new Date().setHours(24, 0, 0, 0)).getTime() / 1000,
     config: {
@@ -123,6 +123,9 @@ function demoData() {
         ][i],
         site: "s" + i,
         connections: [3, 2, 0][i],
+        downloading: i === 1,
+        progress: i === 1 ? 0.64 : undefined,
+        down: i === 1 ? 2.1 * MB : 0,
         limit: [8, 6, 0][i] * MB,
         up: [8.2, 6.4, 4][i] * MB,
         managed: i < 2,
@@ -136,9 +139,9 @@ function demoData() {
       down: [12.4, 18.6, 11.8][i] * GB,
     })),
     siteSpeeds: sites.flatMap((site, i) =>
-      Array.from({ length: 60 }, (_, j) => ({
+      Array.from({ length: 120 }, (_, j) => ({
         site: site.id,
-        time: now - (59 - j) * 30,
+        time: now - (119 - j) * 15,
         up: (3 + i + Math.sin(j / 7 + i)) * MB,
         down: ((i + 1) * MB) / 4,
       })),
@@ -314,6 +317,7 @@ export function App() {
     [csrf, setCsrf] = useState(""),
     [page, setPage] = useState(0),
     [torrentPage, setTorrentPage] = useState(0),
+    [downloadPage, setDownloadPage] = useState(0),
     [menu, setMenu] = useState(false),
     [period, setPeriod] = useState("day"),
     [speedWindow, setSpeedWindow] = useState(1800),
@@ -492,7 +496,7 @@ export function App() {
   async function refresh() {
     if (!demo) {
       const v = await api(
-        `snapshot?period=${page === 1 ? period : "day"}&date=${page === 1 ? date : new Date().toLocaleDateString("en-CA")}&window=${speedWindow}&view=${page === 0 ? "active" : page === 1 || page === 2 ? "all" : "none"}&offset=${torrentPage * 50}&search=${encodeURIComponent(page === 1 ? search : "")}`,
+        `snapshot?period=${[1, 10].includes(page) ? period : "day"}&date=${[1, 10].includes(page) ? date : new Date().toLocaleDateString("en-CA")}&window=${speedWindow}&group=${page === 10 ? "downloaders" : "sites"}&view=${page === 0 ? "active" : page === 8 ? "all" : "none"}&downloadOffset=${downloadPage * 50}&offset=${torrentPage * 50}&search=${encodeURIComponent(page === 8 ? search : "")}`,
       );
       setData(v);
     }
@@ -506,7 +510,7 @@ export function App() {
       inFlight = true;
       try {
         const v = await api(
-          `snapshot?period=${page === 1 ? period : "day"}&date=${page === 1 ? date : new Date().toLocaleDateString("en-CA")}&window=${speedWindow}&view=${page === 0 ? "active" : page === 1 || page === 2 ? "all" : "none"}&offset=${torrentPage * 50}&search=${encodeURIComponent(page === 1 ? search : "")}`,
+          `snapshot?period=${[1, 10].includes(page) ? period : "day"}&date=${[1, 10].includes(page) ? date : new Date().toLocaleDateString("en-CA")}&window=${speedWindow}&group=${page === 10 ? "downloaders" : "sites"}&view=${page === 0 ? "active" : page === 8 ? "all" : "none"}&downloadOffset=${downloadPage * 50}&offset=${torrentPage * 50}&search=${encodeURIComponent(page === 8 ? search : "")}`,
         );
         if (alive) {
           setData(v);
@@ -524,7 +528,16 @@ export function App() {
       alive = false;
       clearInterval(timer);
     };
-  }, [auth, period, date, page, torrentPage, search, speedWindow]);
+  }, [
+    auth,
+    period,
+    date,
+    page,
+    torrentPage,
+    downloadPage,
+    search,
+    speedWindow,
+  ]);
   const totals = useMemo(() => {
     const v = { up: 0, down: 0, sites: {}, uncertain: false };
     for (const b of data?.buckets || []) {
@@ -554,13 +567,17 @@ export function App() {
       t("历史归属", "Historical attribution"),
     names = [
       t("流量总览", "Overview"),
-      t("站点统计", "Sites"),
+      t("流量统计", "Statistics"),
       t("带宽出口", "Bandwidth outlets"),
       t("下载管理", "Downloaders"),
       t("系统设置", "Settings"),
       t("回调通知", "Webhook"),
       t("备份恢复", "Backup & restore"),
       t("关于程序", "About"),
+      t("站点策略", "Site policies"),
+      t("站点识别", "Site recognition"),
+      t("下载器统计", "Downloader statistics"),
+      t("运行记录", "Activity log"),
     ],
     nav = [
       House,
@@ -572,13 +589,39 @@ export function App() {
       FloppyDisk,
       Info,
     ];
+  const group = [1, 10].includes(page)
+    ? 1
+    : [3, 2, 8, 11].includes(page)
+      ? 3
+      : [4, 9, 5, 6].includes(page)
+        ? 4
+        : page;
+  const tabs =
+    group === 1
+      ? [
+          [1, t("站点统计", "By site")],
+          [10, t("下载器统计", "By downloader")],
+        ]
+      : group === 3
+        ? [
+            [3, t("下载器", "Downloaders")],
+            [2, t("带宽出口", "Bandwidth outlets")],
+            [8, t("站点策略", "Site policies")],
+            [11, t("运行记录", "Activity log")],
+          ]
+        : group === 4
+          ? [
+              [4, t("常规设置", "General")],
+              [9, t("站点识别", "Site recognition")],
+              [5, t("回调通知", "Webhook")],
+              [6, t("备份恢复", "Backup & restore")],
+            ]
+          : [];
   function open(kind, v = {}) {
     if (kind === "pool") {
       const schedule = v.schedule || {};
       const nightBudget =
-        schedule.nightBudget ||
-        Math.round((Number(v.budget) * 1000000) / 8) ||
-        6250000;
+        schedule.nightBudget || rateBytes(v.budget) || 6250000;
       v = {
         ...v,
         schedule: {
@@ -590,7 +633,7 @@ export function App() {
             ? schedule.days
             : [0, 1, 2, 3, 4, 5, 6],
         },
-        nightMbps: (nightBudget * 8) / 1000000,
+        nightKB: rateInput(nightBudget),
       };
     }
     setModal(kind);
@@ -601,11 +644,11 @@ export function App() {
     open("site", {
       ...s,
       domainText: s.domains.join("\n"),
-      minimum: (s.minimum || 50000) / 1000,
-      maximum: Number((s.maximum / MB).toFixed(3)),
-      afterTarget: Number((s.afterTarget / MB).toFixed(3)),
-      dayTarget: Number((s.dayTarget / GB).toFixed(3)),
-      monthTarget: Number((s.monthTarget / GB).toFixed(3)),
+      minimum: rateInput(s.minimum || 50000),
+      maximum: rateInput(s.maximum),
+      afterTarget: rateInput(s.afterTarget),
+      dayTarget: s.dayTarget / GB,
+      monthTarget: s.monthTarget / GB,
     });
   }
   function newSite() {
@@ -619,7 +662,7 @@ export function App() {
       maximum: 0,
       dayTarget: 0,
       monthTarget: 0,
-      afterTarget: Math.round(0.05 * MB),
+      afterTarget: 50000,
     });
   }
   function newClient() {
@@ -637,6 +680,24 @@ export function App() {
       autoManage: false,
       enabled: true,
     });
+  }
+  async function catalogAction(body) {
+    if (body.auto !== undefined && !demo)
+      setData((d) => ({ ...d, catalog: { ...d.catalog, auto: body.auto } }));
+    setBusy(true);
+    setError("");
+    try {
+      if (!demo) {
+        const catalog = await api("site-catalog", body);
+        setData((d) => ({ ...d, catalog }));
+      } else
+        setToast(t("演示模式，不修改站点库", "Demo mode; catalog unchanged"));
+    } catch (e) {
+      setError(e.message);
+      if (!demo) await refresh();
+    } finally {
+      setBusy(false);
+    }
   }
   async function saveConfig(next) {
     if (demo) {
@@ -711,20 +772,27 @@ export function App() {
       if (modal === "site") {
         v.domains = v.domainText.split(/[\n,\s]+/).filter(Boolean);
         delete v.domainText;
+        const previous = c.sites.find((site) => site.id === v.id);
+        if (
+          !previous ||
+          JSON.stringify(previous.domains) !== JSON.stringify(v.domains) ||
+          previous.regex !== v.regex
+        )
+          v.automatic = false;
         for (const k of ["minimum", "maximum", "afterTarget"])
-          v[k] = Math.round(Number(v[k] || 0) * (k === "minimum" ? 1000 : MB));
+          v[k] = rateBytes(v[k]);
         for (const k of ["dayTarget", "monthTarget"])
           v[k] = Math.round(Number(v[k] || 0) * GB);
         v.weight = Number(v.weight);
       }
       if (modal === "pool") {
         v.enabled = true;
-        v.budget = Math.round((Number(v.budget) * 1000000) / 8);
+        v.budget = rateBytes(v.budget);
         v.schedule = {
           ...v.schedule,
-          nightBudget: Math.round((Number(v.nightMbps) * 1000000) / 8),
+          nightBudget: rateBytes(v.nightKB),
         };
-        delete v.nightMbps;
+        delete v.nightKB;
         if (!next.pools.length)
           next.clients = next.clients.map((cl) =>
             cl.pool ? cl : { ...cl, pool: v.id },
@@ -902,18 +970,13 @@ export function App() {
                 ]
               : []),
           ].map((s) => (
-            <tr
-              className="action-row"
-              key={s.id}
-              onClick={() => s.id && editSite(s)}
-            >
+            <tr key={s.id}>
               <td className="name">
                 <span
                   className="dot"
                   style={{ background: siteColor(s.id, c.sites) }}
                 />
                 {s.name}
-                {page === 1 && <small>{s.domains.join(" · ")}</small>}
               </td>
               <td>{bytes(totals.sites[s.id]?.up)}</td>
               <td>{bytes(totals.sites[s.id]?.down)}</td>
@@ -967,8 +1030,12 @@ export function App() {
                 · {bytes(c.pools.find((p) => p.id === cl.pool)?.budget, true)}
               </small>
               <small>
-                <span className={"dot " + (!s?.online ? "offline" : "")} />
-                {s?.online
+                <span
+                  className={
+                    "dot " + (!cl.enabled || !s?.online ? "offline" : "")
+                  }
+                />
+                {cl.enabled && s?.online
                   ? t("运行中", "Online")
                   : cl.enabled
                     ? t("连接待检查", "Check connection")
@@ -985,65 +1052,121 @@ export function App() {
               )}
             </div>
             <div className="speeds">
-              <span className="up">↑ {bytes(s?.up, true)}</span>
-              <span className="down">↓ {bytes(s?.down, true)}</span>
+              <span className="up">
+                ↑ {bytes(cl.enabled ? s?.up : 0, true)}
+              </span>
+              <span className="down">
+                ↓ {bytes(cl.enabled ? s?.down : 0, true)}
+              </span>
             </div>
-            <button
-              disabled={busy || cl.clearPending}
-              className={
-                cl.strategyEnabled === false || c.policyEnabled === false
-                  ? ""
-                  : "primary"
-              }
-              onClick={async () => {
-                const enabled =
-                  cl.strategyEnabled === false || c.policyEnabled === false;
-                if (
-                  !enabled &&
-                  !confirm(
-                    t(
-                      "停止该下载器自动策略并清空其种子级上传限速？",
-                      "Stop this downloader strategy and clear its torrent upload limits?",
-                    ),
-                  )
-                )
-                  return;
-                setBusy(true);
-                try {
-                  if (!demo) await api("client-policy", { id: cl.id, enabled });
-                  else
-                    setData((d) => ({
-                      ...d,
-                      config: {
-                        ...d.config,
-                        clients: d.config.clients.map((x) =>
-                          x.id === cl.id
-                            ? { ...x, strategyEnabled: enabled }
-                            : x,
-                        ),
-                      },
-                    }));
-                  await refresh();
-                } catch (e) {
-                  setError(e.message);
-                } finally {
-                  setBusy(false);
-                }
-              }}
-            >
-              {cl.strategyEnabled === false || c.policyEnabled === false
-                ? t("启动自动策略", "Start strategy")
-                : t("停止自动策略", "Stop strategy")}
-            </button>
-            {page === 3 && (
+            <div className="client-actions">
               <button
-                className="icon"
-                aria-label={t("编辑", "Edit")}
-                onClick={() => open("client", cl)}
+                disabled={busy || cl.restorePending || cl.clearPending}
+                onClick={async () => {
+                  if (
+                    cl.enabled &&
+                    !confirm(
+                      t(
+                        "停用后停止采集和分配，并恢复系统施加的限速？",
+                        "Disable monitoring and allocation, restoring system-owned limits?",
+                      ),
+                    )
+                  )
+                    return;
+                  setBusy(true);
+                  try {
+                    if (!demo)
+                      await api("client-enabled", {
+                        id: cl.id,
+                        enabled: !cl.enabled,
+                      });
+                    else
+                      setData((d) => ({
+                        ...d,
+                        config: {
+                          ...d.config,
+                          clients: d.config.clients.map((x) =>
+                            x.id === cl.id ? { ...x, enabled: !cl.enabled } : x,
+                          ),
+                        },
+                      }));
+                    await refresh();
+                  } catch (e) {
+                    setError(e.message);
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
               >
-                <GearSix />
+                {cl.enabled
+                  ? t("停用下载器", "Disable downloader")
+                  : t("启用下载器", "Enable downloader")}
               </button>
-            )}
+              {cl.restorePending && (
+                <small role="status">
+                  {t("系统限速恢复待重试", "System limit recovery pending")}
+                </small>
+              )}
+              <button
+                disabled={
+                  busy || !cl.enabled || cl.restorePending || cl.clearPending
+                }
+                className={
+                  cl.strategyEnabled === false || c.policyEnabled === false
+                    ? ""
+                    : "primary"
+                }
+                onClick={async () => {
+                  const enabled =
+                    cl.strategyEnabled === false || c.policyEnabled === false;
+                  if (
+                    !enabled &&
+                    !confirm(
+                      t(
+                        "停止该下载器自动策略并清空其种子级上传限速？",
+                        "Stop this downloader strategy and clear its torrent upload limits?",
+                      ),
+                    )
+                  )
+                    return;
+                  setBusy(true);
+                  try {
+                    if (!demo)
+                      await api("client-policy", { id: cl.id, enabled });
+                    else
+                      setData((d) => ({
+                        ...d,
+                        config: {
+                          ...d.config,
+                          clients: d.config.clients.map((x) =>
+                            x.id === cl.id
+                              ? { ...x, strategyEnabled: enabled }
+                              : x,
+                          ),
+                        },
+                      }));
+                    await refresh();
+                  } catch (e) {
+                    setError(e.message);
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+              >
+                {cl.strategyEnabled === false || c.policyEnabled === false
+                  ? t("启动自动策略", "Start strategy")
+                  : t("停止自动策略", "Stop strategy")}
+              </button>
+              {page === 3 && (
+                <button
+                  className="icon"
+                  aria-label={t("编辑", "Edit")}
+                  onClick={() => open("client", cl)}
+                >
+                  <GearSix />
+                </button>
+              )}
+            </div>
           </div>
         );
       })}
@@ -1071,13 +1194,22 @@ export function App() {
   const visibleTorrents = (data?.torrents || []).filter(
     (x) =>
       (serverPaged ||
-        page !== 1 ||
+        page !== 8 ||
         !search ||
         x.name.toLowerCase().includes(search.toLowerCase()) ||
         (x.hosts || []).some((h) =>
           h.toLowerCase().includes(search.toLowerCase()),
         )) &&
       (page !== 0 || x.connections > 0 || x.up > 0),
+  );
+  const downloading =
+    data?.downloading ||
+    (demo
+      ? data.torrents.filter((row) => row.downloading || row.down > 0)
+      : []);
+  const downloadTotal = data?.downloadingTotal ?? downloading.length;
+  const downloadCurrent = Math.floor(
+    (data?.downloadOffset ?? downloadPage * 50) / 50,
   );
   const torrentCount = data?.torrentTotal ?? visibleTorrents.length;
   const lastTorrentPage = Math.max(0, Math.ceil(torrentCount / 50) - 1);
@@ -1391,13 +1523,13 @@ export function App() {
           </div>
         </div>
         <nav className="nav" id="main-navigation">
-          {[0, 1, 2, 3, 5, 6, 4, 7].map((i) => {
+          {[0, 1, 3, 4, 7].map((i) => {
             const name = names[i];
             const I = nav[i];
             return (
               <button
                 key={i}
-                className={page === i ? "active" : ""}
+                className={group === i ? "active" : ""}
                 onClick={() => {
                   setPage(i);
                   setMenu(false);
@@ -1427,7 +1559,7 @@ export function App() {
             <List size={22} />
           </button>
           <div className="page-title">
-            <h1>{names[page]}</h1>
+            <h1>{names[group]}</h1>
           </div>
           <div className="controls">
             {controls}
@@ -1451,6 +1583,27 @@ export function App() {
             )}
           </div>
         )}
+        {!!tabs.length && (
+          <div
+            className="section-tabs"
+            role="tablist"
+            aria-label={t("页面分类", "Page sections")}
+          >
+            {tabs.map(([key, label]) => (
+              <button
+                key={key}
+                role="tab"
+                aria-selected={page === key}
+                onClick={() => {
+                  setPage(key);
+                  setSearch("");
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
         {error && !modal && (
           <div className="notice error" role="alert">
             {error}
@@ -1469,15 +1622,15 @@ export function App() {
             {v}
           </div>
         ))}
-        {page < 2 && (
+        {[0, 1, 10].includes(page) && (
           <>
             <div
               className={
                 "toolbar filters " + (page === 0 ? "overview-filters" : "")
               }
             >
-              {page === 1 && periods}
-              {page === 1 && period === "week" && (
+              {[1, 10].includes(page) && periods}
+              {[1, 10].includes(page) && period === "week" && (
                 <div className="period-selector">
                   <select
                     aria-label={t("周所属年份", "Week year")}
@@ -1568,7 +1721,7 @@ export function App() {
                   </select>
                 </div>
               )}
-              {page === 1 && period === "month" && (
+              {[1, 10].includes(page) && period === "month" && (
                 <div className="period-selector">
                   <select
                     aria-label={t("月份所属年份", "Month year")}
@@ -1615,7 +1768,7 @@ export function App() {
                   </select>
                 </div>
               )}
-              {page === 1 && period === "year" && (
+              {[1, 10].includes(page) && period === "year" && (
                 <select
                   aria-label={t("选择统计年份", "Choose report year")}
                   value={date.slice(0, 4)}
@@ -1630,7 +1783,7 @@ export function App() {
                   )}
                 </select>
               )}
-              {page === 1 && period === "day" && (
+              {[1, 10].includes(page) && period === "day" && (
                 <input
                   className="date"
                   type={
@@ -1673,7 +1826,7 @@ export function App() {
                   }}
                 />
               )}
-              {page === 1 && (
+              {[1, 10].includes(page) && (
                 <small>
                   {new Date(data.start * 1000).toLocaleDateString()} —{" "}
                   {new Date((data.end - 1) * 1000).toLocaleDateString()} ·{" "}
@@ -1684,18 +1837,6 @@ export function App() {
                 </small>
               )}
               <span className="grow" />
-              {page === 1 && (
-                <>
-                  <button onClick={() => open("match", { url: "" })}>
-                    <Link />
-                    {t("测试匹配", "Test rules")}
-                  </button>
-                  <button className="primary" onClick={newSite}>
-                    <Plus />
-                    {t("添加站点", "Add site")}
-                  </button>
-                </>
-              )}
             </div>
             <div className="stats">
               {[
@@ -1798,7 +1939,108 @@ export function App() {
                 </div>
               )}
             </section>
-            <section className="card">
+            <section className="card downloading-card">
+              <div className="section-head">
+                <div>
+                  <h2>{t("正在下载", "Downloading")}</h2>
+                  <small>
+                    {downloadTotal} {t("个种子", "torrents")} · ↓{" "}
+                    {bytes(
+                      data.downloadRate ??
+                        downloading.reduce(
+                          (sum, row) => sum + (row.down || 0),
+                          0,
+                        ),
+                      true,
+                    )}
+                  </small>
+                </div>
+              </div>
+              {!downloading.length ? (
+                <div className="empty">
+                  {t("暂无正在下载的种子", "No torrents downloading")}
+                </div>
+              ) : (
+                <div className="table-wrap">
+                  <table className="download-table">
+                    <thead>
+                      <tr>
+                        {[
+                          t("种子名称", "Torrent name"),
+                          t("当前下载", "Download rate"),
+                          t("进度", "Progress"),
+                          t("下载器", "Downloader"),
+                          t("站点", "Site"),
+                          t("当前上传", "Upload rate"),
+                        ].map((label) => (
+                          <th key={label}>{label}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {downloading.map((row) => (
+                        <tr key={row.key}>
+                          <td title={row.name}>
+                            <span className="download-name">{row.name}</span>
+                          </td>
+                          <td className="down">{bytes(row.down, true)}</td>
+                          <td>
+                            {typeof row.progress === "number" ? (
+                              <div className="download-progress">
+                                <progress
+                                  max="1"
+                                  value={Math.max(0, Math.min(1, row.progress))}
+                                />
+                                <small>
+                                  {(
+                                    Math.max(0, Math.min(1, row.progress)) * 100
+                                  ).toFixed(1)}
+                                  %
+                                </small>
+                              </div>
+                            ) : (
+                              "—"
+                            )}
+                          </td>
+                          <td>
+                            {c.clients.find((cl) => cl.id === row.client)
+                              ?.name || "—"}
+                          </td>
+                          <td>{siteName(row.site)}</td>
+                          <td className="up">{bytes(row.up, true)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              {downloadTotal > 50 && (
+                <div className="pagination">
+                  <button
+                    disabled={downloadCurrent === 0}
+                    onClick={() => setDownloadPage(downloadCurrent - 1)}
+                  >
+                    {t("上一页", "Previous")}
+                  </button>
+                  <small>
+                    {downloadCurrent + 1} / {Math.ceil(downloadTotal / 50)}
+                  </small>
+                  <button
+                    disabled={(downloadCurrent + 1) * 50 >= downloadTotal}
+                    onClick={() => setDownloadPage(downloadCurrent + 1)}
+                  >
+                    {t("下一页", "Next")}
+                  </button>
+                </div>
+              )}
+              <p className="hint">
+                {t(
+                  "包含正在下载或等待数据的运行中任务；暂停和仅做种任务不显示。",
+                  "Includes running downloads waiting for data. Paused and seeding-only tasks are excluded.",
+                )}
+              </p>
+            </section>
+            <section className="card allocation-card">
               <div className="section-head">
                 <div>
                   <h2>{t("动态带宽分配", "Dynamic bandwidth")}</h2>
@@ -1829,8 +2071,8 @@ export function App() {
               <p className="hint">
                 <Info size={15} />
                 {t(
-                  "显示有上传连接或正在上传的种子，包括待分配和操作失败项；由总开关管理自动策略。",
-                  "Only controlled torrents with upload connections appear here. Find all torrents in Sites or Bandwidth policies.",
+                  "显示有上传连接或正在上传的种子，包括待分配和操作失败项；自动策略由各下载器独立控制。",
+                  "Shows torrents with upload connections or actual uploads, including pending and failed operations. Each downloader controls its own strategy.",
                 )}
               </p>
             </section>
@@ -1873,24 +2115,53 @@ export function App() {
               <p className="hint">
                 <Info size={15} />
                 {t(
-                  "Tracker 按域名自动归类，忽略 passkey。点击站点修改名称；可将多个域名放在同一站点。",
-                  "Trackers are discovered by hostname, ignoring passkeys. Click a site to rename it or group multiple domains.",
+                  "统计按实际记录的站点归属汇总。名称、权重及域名规则请在下载管理的站点策略中调整。",
+                  "Totals retain their recorded site attribution. Edit names, weights and rules under Download management → Site policies.",
                 )}
               </p>
             </section>
-            <section className="card">
-              <div className="section-head">
-                <h2>{t("种子归属", "Torrent ownership")}</h2>
-                <input
-                  className="search"
-                  placeholder={t("搜索种子名称", "Search torrents")}
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                />
-              </div>
-              {torrents}
-            </section>
           </>
+        )}
+        {page === 10 && (
+          <section className="card">
+            <h2>{t("下载器流量", "Downloader traffic")}</h2>
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>{t("下载器", "Downloader")}</th>
+                    <th>{t("上传", "Upload")}</th>
+                    <th>{t("下载", "Download")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(data.downloaderStats || []).map((row) => (
+                    <tr key={row.id}>
+                      <td>
+                        {c.clients.find((cl) => cl.id === row.id)?.name ||
+                          t("历史下载器", "Historical downloader")}
+                        {row.uncertain && (
+                          <small>
+                            {t("含补记流量", "Includes uncertain intervals")}
+                          </small>
+                        )}
+                      </td>
+                      <td>{bytes(row.up)}</td>
+                      <td>{bytes(row.down)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {!data.downloaderStats?.length && (
+                <div className="empty">
+                  {t(
+                    "该时段暂无新增流量",
+                    "No new traffic recorded for this period",
+                  )}
+                </div>
+              )}
+            </div>
+          </section>
         )}
         {page === 2 && (
           <>
@@ -1903,7 +2174,7 @@ export function App() {
                   open("pool", {
                     id: id(),
                     name: t("主出口", "Main uplink"),
-                    budget: 50,
+                    budget: 6250,
                     enabled: true,
                   })
                 }
@@ -1931,7 +2202,7 @@ export function App() {
                   </div>
                   <button
                     onClick={() =>
-                      open("pool", { ...p, budget: (p.budget * 8) / 1000000 })
+                      open("pool", { ...p, budget: rateInput(p.budget) })
                     }
                   >
                     <GearSix />
@@ -1966,12 +2237,23 @@ export function App() {
                 </p>
               </section>
             ))}
+          </>
+        )}
+        {page === 8 && (
+          <>
+            {" "}
             <section className="card">
               <div className="section-head">
                 <h2>{t("站点权重与额度", "Site weights & allowances")}</h2>
-                <button onClick={() => setPage(1)}>
-                  {t("编辑站点", "Edit sites")}
-                </button>
+                <div className="toolbar">
+                  <button onClick={() => open("match", { url: "" })}>
+                    {t("测试匹配", "Test rules")}
+                  </button>
+                  <button className="primary" onClick={newSite}>
+                    <Plus />
+                    {t("添加站点", "Add site")}
+                  </button>
+                </div>
               </div>
               <div className="table-wrap">
                 <table>
@@ -1994,7 +2276,16 @@ export function App() {
                         className="action-row"
                         onClick={() => editSite(s)}
                       >
-                        <td>{s.name}</td>
+                        <td className="name">
+                          {s.name}
+                          <small>
+                            {s.catalogId
+                              ? t("站点库识别", "Catalog match")
+                              : s.automatic
+                                ? t("域名发现", "Domain discovery")
+                                : t("手动规则", "Manual rule")}
+                          </small>
+                        </td>
                         <td>{s.weight}</td>
                         <td>{bytes(s.minimum, true)}</td>
                         <td>{s.maximum ? bytes(s.maximum, true) : "—"}</td>
@@ -2004,6 +2295,23 @@ export function App() {
                 </table>
               </div>
             </section>
+            <section className="card">
+              <div className="section-head">
+                <h2>{t("种子归属", "Torrent ownership")}</h2>
+                <input
+                  className="search"
+                  placeholder={t("搜索种子名称", "Search torrents")}
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+              </div>
+              {torrents}
+            </section>
+          </>
+        )}
+        {page === 11 && (
+          <>
+            {" "}
             <section className="card">
               <h2>{t("恢复清单", "Recovery queue")}</h2>
               {!data.leases.length ? (
@@ -2022,6 +2330,31 @@ export function App() {
                           <td className="name">{v.key}</td>
                           <td>{bytes(v.limit, true)}</td>
                           <td>{v.state}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
+            <section className="card">
+              <div className="section-head">
+                <h2>{t("运行记录", "Activity log")}</h2>
+                <small>{t("最近 100 条", "Latest 100 events")}</small>
+              </div>
+              {!data.events.length ? (
+                <div className="empty">
+                  {t("暂无操作记录", "No activity yet")}
+                </div>
+              ) : (
+                <div className="table-wrap">
+                  <table>
+                    <tbody>
+                      {data.events.map((v, i) => (
+                        <tr key={i}>
+                          <td>{new Date(v.time * 1000).toLocaleString()}</td>
+                          <td>{v.kind}</td>
+                          <td className="name">{v.message}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -2224,8 +2557,8 @@ export function App() {
             <h3>{t("统计与自动策略", "Accounting and allocation")}</h3>
             <p>
               {t(
-                "所有下载器持续统计，每个下载器独立启停自动策略。相同出口共同分配预算，活跃站点先按1–10权重分配，再由站内种子平分。最低额度不足时调整，固定最低额度优先于出口预算和站点上限，超出时告警，不降低最低额度。",
-                "Monitoring stays active; each downloader independently starts/stops allocation. Downloaders share an outlet budget. Active sites receive weighted shares (1–10), split equally across torrents. Fixed minimums take precedence over budgets and site caps, with warnings.",
+                "已启用的下载器持续统计，每个下载器独立启停自动策略；停用下载器会停止采集并恢复系统限速。相同出口共同分配预算，活跃站点先按1–10权重分配，再由站内种子平分。最低额度不足时调整，固定最低额度优先于出口预算和站点上限，超出时告警，不降低最低额度。",
+                "Enabled downloaders keep monitoring; each independently starts/stops allocation. Disabling a downloader stops collection and restores system-owned limits. Downloaders share an outlet budget. Active sites receive weighted shares (1–10), split equally across torrents. Fixed minimums take precedence over budgets and site caps, with warnings.",
               )}
             </p>
             <h3>{t("停止与恢复", "Stop and recovery")}</h3>
@@ -2245,10 +2578,78 @@ export function App() {
             <h3>{t("备份与通知", "Backups and notifications")}</h3>
             <p>
               {t(
-                "备份包含账号、配置、统计和密钥；导入前停止策略并等待清空，恢复后重新登录且策略暂停。通知支持日周月报告与告警，失败有限重试，响应丢失仍可能重复。默认50 Mbps为6.25 MB/s，最低额度默认每种子50 KB/s；额度不是实际速度保证。",
-                "Backups contain accounts, settings, statistics and keys. Stop strategies and wait for clearance before import; sign in again afterwards with allocation paused. Reports and alerts have bounded retries and may duplicate after a lost response. Default50 Mbps equals6.25 MB/s; the per-torrent minimum defaults to50 KB/s. Allowances do not guarantee actual speed.",
+                "备份包含账号、配置、统计和密钥；导入前停止策略并等待清空，恢复后重新登录且策略暂停。通知支持日周月报告与告警，失败有限重试，响应丢失仍可能重复。默认6250 KB/s为6.25 MB/s，最低额度默认每种子50 KB/s；额度不是实际速度保证。",
+                "Backups contain accounts, settings, statistics and keys. Stop strategies and wait for clearance before import; sign in again afterwards with allocation paused. Reports and alerts have bounded retries and may duplicate after a lost response. Default6250 KB/s equals6.25 MB/s; the per-torrent minimum defaults to50 KB/s. Allowances do not guarantee actual speed.",
               )}
             </p>
+          </section>
+        )}
+        {page === 9 && (
+          <section className="card">
+            <div className="section-head">
+              <h2>{t("自动站点识别", "Automatic site recognition")}</h2>
+              <button
+                disabled={busy}
+                onClick={() => catalogAction({ update: true })}
+              >
+                <ArrowClockwise />
+                {t("立即更新", "Update now")}
+              </button>
+            </div>
+            <p className="subtitle">PT-depiler · MIT</p>
+            <label className="checkbox">
+              <input
+                type="checkbox"
+                checked={data.catalog?.auto !== false}
+                disabled={busy}
+                onChange={(e) => catalogAction({ auto: e.target.checked })}
+              />
+              {t("每天自动检查站点库更新", "Check for catalog updates daily")}
+            </label>
+            <dl className="catalog-status">
+              <dt>{t("站点／域名", "Sites / domains")}</dt>
+              <dd>
+                {data.catalog?.sites ?? 0} / {data.catalog?.domains ?? 0}
+              </dd>
+              <dt>{t("数据版本", "Data version")}</dt>
+              <dd>
+                {data.catalog?.version?.slice(0, 12) ||
+                  t("内置版本", "Bundled")}
+              </dd>
+              <dt>{t("最近检查", "Last checked")}</dt>
+              <dd>
+                {data.catalog?.checked
+                  ? new Date(data.catalog.checked * 1000).toLocaleString()
+                  : t(
+                      "尚未检查，使用内置库",
+                      "Not checked; using bundled data",
+                    )}
+              </dd>
+              <dt>{t("最近更新", "Last updated")}</dt>
+              <dd>
+                {data.catalog?.updated
+                  ? new Date(data.catalog.updated * 1000).toLocaleString()
+                  : "—"}
+              </dd>
+            </dl>
+            {data.catalog?.error && (
+              <p className="notice" role="status">
+                {data.catalog.error}
+              </p>
+            )}
+            <p className="hint">
+              {t(
+                "优先使用手动规则。自动识别只匹配公开域名，忽略 passkey；同站新域名合并，已有分组、名称、权重与历史统计保留。冲突或未收录的域名保持原分类。更新失败继续使用当前库。",
+                "Manual rules take priority. Only public domains are matched; passkeys are ignored. New aliases are grouped, while existing groups, names, weights and history remain. Conflicting or unknown domains keep their classification. Failed updates retain the current catalog.",
+              )}
+            </p>
+            <a
+              href="https://github.com/pt-plugins/PT-depiler"
+              target="_blank"
+              rel="noreferrer"
+            >
+              {t("查看数据来源", "View source")}
+            </a>
           </section>
         )}
         {page === 4 && (
@@ -2287,31 +2688,6 @@ export function App() {
                 ))}
               </section>
             </div>
-            <section className="card">
-              <div className="section-head">
-                <h2>{t("运行记录", "Activity log")}</h2>
-                <small>{t("最近 100 条", "Latest 100 events")}</small>
-              </div>
-              {!data.events.length ? (
-                <div className="empty">
-                  {t("暂无操作记录", "No activity yet")}
-                </div>
-              ) : (
-                <div className="table-wrap">
-                  <table>
-                    <tbody>
-                      {data.events.map((v, i) => (
-                        <tr key={i}>
-                          <td>{new Date(v.time * 1000).toLocaleString()}</td>
-                          <td>{v.kind}</td>
-                          <td className="name">{v.message}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </section>
             <p className="footnote">
               Torrent Flow v{data.version} · MIT License
               <br />
@@ -2523,8 +2899,8 @@ export function App() {
                     </div>
                     {field(
                       "maximum",
-                      "最高额度 MiB/s（0 无上限）",
-                      "Maximum MiB/s (0 = uncapped)",
+                      "最高额度 KB/s（0 无上限）",
+                      "Maximum KB/s (0 = uncapped)",
                       "number",
                       { min: 0, step: 0.001 },
                     )}
@@ -2537,23 +2913,23 @@ export function App() {
                     <div className="field-pair">
                       {field(
                         "dayTarget",
-                        "日目标 GiB（0 关闭）",
-                        "Daily target GiB (0 = off)",
+                        "日目标 GB（0 关闭）",
+                        "Daily target GB (0 = off)",
                         "number",
-                        { min: 0, step: 0.001 },
+                        { min: 0, step: "any" },
                       )}
                       {field(
                         "monthTarget",
-                        "月目标 GiB（0 关闭）",
-                        "Monthly target GiB (0 = off)",
+                        "月目标 GB（0 关闭）",
+                        "Monthly target GB (0 = off)",
                         "number",
-                        { min: 0, step: 0.001 },
+                        { min: 0, step: "any" },
                       )}
                     </div>
                     {field(
                       "afterTarget",
-                      "达标后额度 MiB/s（大于 0）",
-                      "After-target allowance MiB/s (>0)",
+                      "达标后额度 KB/s（大于 0）",
+                      "After-target allowance KB/s (>0)",
                       "number",
                       { min: 0.001, step: 0.001 },
                     )}
@@ -2564,10 +2940,10 @@ export function App() {
                     {field("name", "名称", "Name", "text", { required: true })}
                     {field(
                       "budget",
-                      "日间/基础上传带宽 Mbps（默认 50）",
-                      "Outlet upload bandwidth Mbps (default 50)",
+                      "日间/基础上传额度 KB/s（默认 6250）",
+                      "Day/base upload allowance KB/s (default 6250)",
                       "number",
-                      { required: true, min: 0.001, step: "any" },
+                      { required: true, min: 1.024, step: 0.001 },
                     )}
                     <h3>{t("夜间备用预算", "Night budget")}</h3>
                     <label className="checkbox">
@@ -2595,12 +2971,12 @@ export function App() {
                     >
                       <fieldset disabled={!form.schedule?.enabled}>
                         {field(
-                          "nightMbps",
-                          "夜间上传带宽 Mbps",
-                          "Night upload bandwidth Mbps",
+                          "nightKB",
+                          "夜间上传额度 KB/s",
+                          "Night upload allowance KB/s",
                           "number",
                           {
-                            min: 0.01,
+                            min: 1.024,
                             step: "any",
                             required: !!form.schedule?.enabled,
                           },
@@ -2683,8 +3059,8 @@ export function App() {
                     </small>
                     <small>
                       {t(
-                        "默认出口 50 Mbps = 6.25 MB/s ≈ 5.96 MiB/s，不是 7 MiB/s。下载器默认绑定；可按实际出口修改，由各下载器的策略开关管理调速，统计始终运行。",
-                        "Default outlet is 50 Mbps (6.25 MB/s, about 5.96 MiB/s). Downloaders bind automatically. Edit it for your uplink; each downloader strategy switch controls allocation while monitoring always runs.",
+                        "默认出口 6250 KB/s = 6.25 MB/s。下载器默认绑定；可按实际出口修改，由各下载器的策略开关管理调速，统计始终运行。",
+                        "Default outlet is 6250 KB/s (6.25 MB/s). Downloaders bind automatically. Edit it for your uplink; each downloader strategy switch controls allocation while monitoring always runs.",
                       )}
                     </small>
                   </>

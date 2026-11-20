@@ -151,7 +151,7 @@ func (s *Store) config() (Config, error) {
 	}
 	if e == nil && c.PolicyVersion < 1 {
 		if len(c.Pools) == 0 {
-			c.Pools = []Pool{{ID: "default-outlet", Name: "默认出口 · 50 Mbps", Budget: 6250000, Enabled: true}}
+			c.Pools = []Pool{{ID: "default-outlet", Name: "默认出口", Budget: 6250000, Enabled: true}}
 		}
 		for i := range c.Clients {
 			c.Clients[i].Enabled = true
@@ -171,6 +171,11 @@ func (s *Store) config() (Config, error) {
 			c.Pools[i].Enabled = true
 		}
 		c.PolicyVersion = 1
+	}
+	for i, p := range c.Pools {
+		if p.ID == "default-outlet" && p.Name == "默认出口 · 50 Mbps" {
+			c.Pools[i].Name = "默认出口"
+		}
 	}
 	return c, e
 }

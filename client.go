@@ -215,23 +215,25 @@ func (a *Adapter) list(ctx context.Context) ([]Torrent, error) {
 			return nil, e
 		}
 		var rows []struct {
-			Hash        string `json:"hash"`
-			Name        string `json:"name"`
-			Uploaded    int64  `json:"uploaded"`
-			Downloaded  int64  `json:"downloaded"`
-			Up          int64  `json:"upspeed"`
-			Down        int64  `json:"dlspeed"`
-			Limit       int64  `json:"up_limit"`
-			Connections int    `json:"num_leechs"`
-			Tracker     string `json:"tracker"`
-			Added       int64  `json:"added_on"`
+			DownloadState string   `json:"state"`
+			Progress      *float64 `json:"progress"`
+			Hash          string   `json:"hash"`
+			Name          string   `json:"name"`
+			Uploaded      int64    `json:"uploaded"`
+			Downloaded    int64    `json:"downloaded"`
+			Up            int64    `json:"upspeed"`
+			Down          int64    `json:"dlspeed"`
+			Limit         int64    `json:"up_limit"`
+			Connections   int      `json:"num_leechs"`
+			Tracker       string   `json:"tracker"`
+			Added         int64    `json:"added_on"`
 		}
 		if e = json.Unmarshal(b, &rows); e != nil {
 			return nil, fmt.Errorf("invalid qBittorrent torrent list")
 		}
 		trackerRequests := 0
 		for _, r := range rows {
-			t := Torrent{Client: a.c.ID, Hash: strings.ToLower(r.Hash), Name: r.Name, Uploaded: r.Uploaded, Downloaded: r.Downloaded, Up: r.Up, Down: r.Down, Limit: r.Limit, Connections: r.Connections, Added: r.Added}
+			t := Torrent{Downloading: r.Down > 0 || qbDownloading(r.DownloadState), Progress: r.Progress, Client: a.c.ID, Hash: strings.ToLower(r.Hash), Name: r.Name, Uploaded: r.Uploaded, Downloaded: r.Downloaded, Up: r.Up, Down: r.Down, Limit: r.Limit, Connections: r.Connections, Added: r.Added}
 			if t.Limit < 0 {
 				t.Limit = 0
 			}
@@ -300,17 +302,19 @@ func (a *Adapter) list(ctx context.Context) ([]Torrent, error) {
 	} else {
 		var r struct {
 			Torrents []struct {
-				Hash        string `json:"hashString"`
-				Name        string `json:"name"`
-				Uploaded    int64  `json:"uploadedEver"`
-				Downloaded  int64  `json:"downloadedEver"`
-				Up          int64  `json:"rateUpload"`
-				Down        int64  `json:"rateDownload"`
-				Limit       int64  `json:"uploadLimit"`
-				Limited     bool   `json:"uploadLimited"`
-				Connections int    `json:"peersGettingFromUs"`
-				Added       int64  `json:"addedDate"`
-				Trackers    []struct {
+				DownloadState int      `json:"status"`
+				Progress      *float64 `json:"percentDone"`
+				Hash          string   `json:"hashString"`
+				Name          string   `json:"name"`
+				Uploaded      int64    `json:"uploadedEver"`
+				Downloaded    int64    `json:"downloadedEver"`
+				Up            int64    `json:"rateUpload"`
+				Down          int64    `json:"rateDownload"`
+				Limit         int64    `json:"uploadLimit"`
+				Limited       bool     `json:"uploadLimited"`
+				Connections   int      `json:"peersGettingFromUs"`
+				Added         int64    `json:"addedDate"`
+				Trackers      []struct {
 					Announce string `json:"announce"`
 				} `json:"trackers"`
 				Peers []struct {
@@ -318,12 +322,12 @@ func (a *Adapter) list(ctx context.Context) ([]Torrent, error) {
 				} `json:"peers"`
 			} `json:"torrents"`
 		}
-		fields := []string{"hashString", "name", "uploadedEver", "downloadedEver", "rateUpload", "rateDownload", "uploadLimit", "uploadLimited", "peersGettingFromUs", "addedDate", "trackers", "peers"}
+		fields := []string{"hashString", "name", "uploadedEver", "downloadedEver", "rateUpload", "rateDownload", "uploadLimit", "uploadLimited", "peersGettingFromUs", "addedDate", "trackers", "peers", "status", "percentDone"}
 		if e := a.rpc(ctx, "torrent-get", map[string]any{"fields": fields}, &r); e != nil {
 			return nil, e
 		}
 		for _, v := range r.Torrents {
-			t := Torrent{Client: a.c.ID, Hash: strings.ToLower(v.Hash), Name: v.Name, Uploaded: v.Uploaded, Downloaded: v.Downloaded, Up: v.Up, Down: v.Down, Connections: v.Connections, Added: v.Added}
+			t := Torrent{Downloading: v.Down > 0 || v.DownloadState == 4, Progress: v.Progress, Client: a.c.ID, Hash: strings.ToLower(v.Hash), Name: v.Name, Uploaded: v.Uploaded, Downloaded: v.Downloaded, Up: v.Up, Down: v.Down, Connections: v.Connections, Added: v.Added}
 			interested := 0
 			for _, p := range v.Peers {
 				if p.Interested {
@@ -407,4 +411,12 @@ func normalizedLimit(c Client, v int64) int64 {
 		return (v + 999) / 1000 * 1000
 	}
 	return v
+}
+
+func qbDownloading(state string) bool {
+	switch state {
+	case "downloading", "stalledDL", "forcedDL", "metaDL", "forcedMetaDL":
+		return true
+	}
+	return false
 }

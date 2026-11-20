@@ -98,8 +98,8 @@ func (sv *Server) backup(w http.ResponseWriter, r *http.Request) {
 	running := false
 	pending := c.ClearPending
 	for _, cl := range c.Clients {
-		pending = pending || cl.ClearPending
-		running = running || (policyOn(c) && clientPolicyOn(cl))
+		pending = pending || cl.ClearPending || cl.RestorePending
+		running = running || (cl.Enabled && policyOn(c) && clientPolicyOn(cl))
 	}
 	if running || leases > 0 || pending {
 		failHTTP(w, 409, "请先停止所有下载器自动策略并等待限速清空 / Stop all downloader strategies and wait for clearance")
@@ -146,6 +146,7 @@ func (sv *Server) backup(w http.ResponseWriter, r *http.Request) {
 	for i := range imported.Clients {
 		imported.Clients[i].StrategyEnabled = &off
 		imported.Clients[i].ClearPending = false
+		imported.Clients[i].RestorePending = false
 	}
 	imported.Revision++
 	conn, err := sv.s.db.Conn(r.Context())
@@ -153,6 +154,7 @@ func (sv *Server) backup(w http.ResponseWriter, r *http.Request) {
 		failHTTP(w, 500, "database unavailable")
 		return
 	}
+	defer sv.e.catalog.reload()
 	defer conn.Close()
 	if _, err = conn.ExecContext(r.Context(), "ATTACH DATABASE ? AS imported", source); err != nil {
 		failHTTP(w, 400, "backup database unavailable")

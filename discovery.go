@@ -11,7 +11,28 @@ var trackerHostname = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9.-]{0,251}[a-z0-9])
 // Discover only tracker hostnames. Paths, credentials and passkeys never become rules.
 // Existing manual domains/RE2 rules retain priority. A discovered site never enables control.
 func discoverSites(c Config, torrents []Torrent) (Config, int) {
+	return discoverSitesWithCatalog(c, torrents, nil)
+}
+func discoverSitesWithCatalog(c Config, torrents []Torrent, catalog map[string]CatalogEntry) (Config, int) {
 	c.Sites = append([]Site{}, c.Sites...)
+	changed := 0
+	for i, s := range c.Sites {
+		if !s.Automatic || s.CatalogID != "" || s.Regex != "" || len(s.Domains) != 1 {
+			continue
+		}
+		h := s.Domains[0]
+		entry, ok := catalogLookup(catalog, h)
+		if !ok {
+			continue
+		}
+		// Existing IDs, custom names, policies and history remain stable.
+		s.CatalogID = entry.ID
+		if s.Name == h {
+			s.Name = entry.Name
+		}
+		c.Sites[i] = s
+		changed++
+	}
 	seen := map[string]bool{}
 	rawByHost := map[string]string{}
 	hosts := []string{}
@@ -31,7 +52,7 @@ func discoverSites(c Config, torrents []Torrent) (Config, int) {
 		}
 	}
 	sort.Strings(hosts)
-	added := 0
+	added := changed
 	for _, h := range hosts {
 		if len(c.Sites) >= 255 {
 			break
@@ -41,7 +62,31 @@ func discoverSites(c Config, torrents []Torrent) (Config, int) {
 		if id != "" || ambiguous {
 			continue
 		}
-		c.Sites = append(c.Sites, Site{ID: randomID(), Name: h, Domains: []string{h}, Weight: 10, Minimum: 50000, AfterTarget: 52429, Automatic: true})
+		entry, known := catalogLookup(catalog, h)
+		target := -1
+		if known {
+			for i, s := range c.Sites {
+				if s.Automatic && s.CatalogID == entry.ID {
+					if target >= 0 {
+						target = -2
+						break
+					}
+					target = i
+				}
+			}
+		}
+		if target >= 0 {
+			s := c.Sites[target]
+			s.Domains = append(append([]string{}, s.Domains...), h)
+			c.Sites[target] = s
+		} else {
+			s := Site{ID: randomID(), Name: h, Domains: []string{h}, Weight: 10, Minimum: 50000, AfterTarget: 52429, Automatic: true}
+			if known && target != -2 {
+				s.Name = entry.Name
+				s.CatalogID = entry.ID
+			}
+			c.Sites = append(c.Sites, s)
+		}
 		added++
 	}
 	needsFallback := false
