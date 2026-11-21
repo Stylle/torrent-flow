@@ -1,5 +1,7 @@
 # Contributor instructions
 
+User clarification (2026-11-21): Site.Maximum is a per-torrent ceiling, not an aggregate site cap. Derive the site's allocator capacity as active torrent count × Maximum; AfterTarget remains an explicitly labelled aggregate site allowance and may only lower that capacity. Fixed floors remain unchanged. Do not warn about outlet over-budget unless actual aggregate floors exceed its effective budget. Alerts are persisted continuous incidents, queued once until resolution; resolution cancels unsent retries, recurrence queues a new job, and numeric fluctuations must not merge distinct downloader/outlet identities.
+
 Overview upload/download cards use the durable lifetime singleton, incremented atomically with traffic deltas/baselines and never retention-pruned. Legacy installations/backups initialize it once from retained traffic only; do not sum downloader counters or claim recovery of expired data. Period statistics and chart ranges remain independent. Backups must restore the aggregate or reconstruct it for old archives.
 
 Read README.md, SECURITY.md and docs/ARCHITECTURE.md before changes. Preserve downloader authentication, per-torrent identity, cumulative accounting, credential encryption and durable recovery ownership contracts.

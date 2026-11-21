@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -256,6 +255,7 @@ func (sv *Server) notificationTick(ctx context.Context, now time.Time) {
 	}
 	n := c.Notify
 	if !n.Enabled || n.URL == "" {
+		sv.s.syncAlertEpisodes(nil, now)
 		return
 	}
 	loc, err := time.LoadLocation(c.Timezone)
@@ -291,6 +291,7 @@ func (sv *Server) notificationTick(ctx context.Context, now time.Time) {
 			sv.s.queueNotification(v.kind+":"+boundary.Format("20060102"), v.kind, "流量台 · "+v.title, body, now)
 		}
 	}
+	var alertMessages []string
 	if n.Alerts {
 		sv.e.stateMu.RLock()
 		messages := append([]string{}, sv.e.warnings...)
@@ -328,10 +329,10 @@ func (sv *Server) notificationTick(ctx context.Context, now time.Time) {
 		if c.ClearPending {
 			messages = append(messages, "系统限速清空尚未完成，正在重试")
 		}
-		for _, msg := range messages {
-			hash := sha256.Sum256([]byte(regexp.MustCompile(`[0-9]+`).ReplaceAllString(msg, "#")))
-			sv.s.queueNotification(fmt.Sprintf("alert:%x:%d", hash[:12], now.Unix()/900), "alert", "流量台 · 告警", msg, now)
-		}
+		alertMessages = messages
+	}
+	if sv.s.syncAlertEpisodes(alertMessages, now) != nil {
+		return // Do not send stale alert retries when current state could not be reconciled.
 	}
 	rows, err := sv.s.db.Query("SELECT id,kind,title,content,at,attempts FROM notification_jobs WHERE state='pending' AND next<=? ORDER BY at LIMIT 4", now.Unix())
 	if err != nil {

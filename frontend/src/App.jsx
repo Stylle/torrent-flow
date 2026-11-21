@@ -50,7 +50,7 @@ function demoData() {
       afterTarget: MB,
     }));
   return {
-    version: "0.1.10",
+    version: "0.1.11",
     catalog: {
       sites: 329,
       domains: 780,
@@ -2268,7 +2268,7 @@ export function App() {
                         t("站点", "Site"),
                         t("权重", "Weight"),
                         t("最低额度", "Minimum"),
-                        t("最高额度", "Maximum"),
+                        t("单种上限", "Maximum"),
                       ].map((x) => (
                         <th key={x}>{x}</th>
                       ))}
@@ -2431,8 +2431,8 @@ export function App() {
               <h2>{t("报告与告警", "Reports & alerts")}</h2>
               <p>
                 {t(
-                  "按系统时区发送：日报报告前一天，周报在周一报告上一周，月报在每月1日报告上个月。告警包括出口最低额度超预算、下载器离线和清空限速待重试。相同告警最多每15分钟一次。",
-                  "Uses the configured timezone. Daily reports cover yesterday; Monday reports cover last week; first-of-month reports cover last month. Alerts cover minimums above budget, offline downloaders and pending clearance, with a 15-minute cooldown.",
+                  "按系统时区发送：日报报告前一天，周报在周一报告上一周，月报在每月1日报告上个月。告警包括出口最低额度超预算、下载器离线和清空限速待重试。同一持续异常只推送一次；解除后取消待重试，再次发生才重新推送。",
+                  "Uses the configured timezone. Daily reports cover yesterday; Monday reports cover last week; first-of-month reports cover last month. Alerts cover minimums above budget, offline downloaders and pending clearance, once per continuous incident; resolved retries are cancelled and recurrence notifies again.",
                 )}
               </p>
               <p className="hint">
@@ -2562,8 +2562,8 @@ export function App() {
             <h3>{t("统计与自动策略", "Accounting and allocation")}</h3>
             <p>
               {t(
-                "已启用的下载器持续统计，每个下载器独立启停自动策略；停用下载器会停止采集并恢复系统限速。相同出口共同分配预算，活跃站点先按1–10权重分配，再由站内种子平分。最低额度不足时调整，固定最低额度优先于出口预算和站点上限，超出时告警，不降低最低额度。",
-                "Enabled downloaders keep monitoring; each independently starts/stops allocation. Disabling a downloader stops collection and restores system-owned limits. Downloaders share an outlet budget. Active sites receive weighted shares (1–10), split equally across torrents. Fixed minimums take precedence over budgets and site caps, with warnings.",
+                "已启用的下载器持续统计，每个下载器独立启停自动策略；停用下载器会停止采集并恢复系统限速。相同出口共同分配预算，活跃站点先按1–10权重分配，再由站内种子平分。最低额度不足时调整，固定最低额度优先于出口预算、单种子上限及达标后站点额度，超出时告警，不降低最低额度。",
+                "Enabled downloaders keep monitoring; each independently starts/stops allocation. Disabling a downloader stops collection and restores system-owned limits. Downloaders share an outlet budget. Active sites receive weighted shares (1–10), split equally across torrents. Fixed minimums take precedence over budgets, per-torrent ceilings and post-target site allowances, with distinct warnings.",
               )}
             </p>
             <h3>{t("停止与恢复", "Stop and recovery")}</h3>
@@ -2904,15 +2904,15 @@ export function App() {
                     </div>
                     {field(
                       "maximum",
-                      "最高额度 KB/s（0 无上限）",
-                      "Maximum KB/s (0 = uncapped)",
+                      "每种子最高额度 KB/s（0 无上限）",
+                      "Maximum per torrent KB/s (0 = uncapped)",
                       "number",
                       { min: 0, step: 0.001 },
                     )}
                     <small>
                       {t(
-                        "最高额度与达标后额度是站点总额度；若低于活跃种子最低额度合计，以种子最低额度为准并提示。日/月目标 0 表示关闭。",
-                        "Site caps and after-target allowances cannot lower the fixed per-torrent minimum. Conflicts produce a warning. Daily/monthly target 0 disables targets.",
+                        "最高额度限制每个种子；站点可分配上限为活跃种子数×单种子上限。达标后额度仍为站点总额度。最低额度冲突时保留最低并明确提示，只有最低合计超出出口预算才报出口超额。",
+                        "Maximum applies per torrent; site capacity is active torrents × maximum. After-target allowance remains site-wide. Fixed minima prevail; only outlet floor totals above its budget trigger an outlet warning.",
                       )}
                     </small>
                     <div className="field-pair">
@@ -2933,8 +2933,8 @@ export function App() {
                     </div>
                     {field(
                       "afterTarget",
-                      "达标后额度 KB/s（大于 0）",
-                      "After-target allowance KB/s (>0)",
+                      "达标后站点总额度 KB/s（大于 0）",
+                      "Site total after target KB/s (>0)",
                       "number",
                       { min: 0.001, step: 0.001 },
                     )}

@@ -1,3 +1,9 @@
+# 0.1.11
+
+- Fix maximum upload allowance to apply per active torrent, with weighted redistribution of unused capacity.
+- Distinguish site ceiling conflicts from actual outlet minimum-budget overflow.
+- Persist continuous alert incidents; notify once until resolution, cancel obsolete retries and notify on recurrence.
+
 # 0.1.10
 
 - Add the green wave favicon, multi-resolution ICO and Apple touch icon, including public HTML declarations and cache-versioned URLs.

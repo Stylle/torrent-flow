@@ -257,13 +257,17 @@ func (e *Engine) tick(ctx context.Context) {
 				perSeed = 1000
 			}
 			floor := int64(len(ts)) * ((perSeed + 999) / 1000 * 1000)
-			maximum := s.Maximum
+			// Maximum is a per-torrent ceiling, unlike the daily/monthly site's
+			// post-target aggregate allowance. Share only the combined capacity.
+			maximum := int64(len(ts)) * s.Maximum
 			if s.DayTarget > 0 && du[id] >= s.DayTarget || s.MonthTarget > 0 && mu[id] >= s.MonthTarget {
-				maximum = s.AfterTarget
+				if maximum == 0 || s.AfterTarget < maximum {
+					maximum = s.AfterTarget
+				}
 			}
 			if maximum > 0 && maximum < floor {
+				warnings = append(warnings, fmt.Sprintf("站点 %s：活跃 %d 个种子，最低额度合计 %s 高于有效上限 %s；保留最低额度（非出口超额） / Site minimum conflicts with cap, not outlet budget", s.Name, len(ts), formatBytes(floor, true), formatBytes(maximum, true)))
 				maximum = floor
-				warnings = append(warnings, "站点最低额度高于配置上限，保留最低额度 / Minimum takes precedence over site cap")
 			}
 			floors[id] = floor
 			totalFloor += floor
