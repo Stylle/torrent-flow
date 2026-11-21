@@ -1,3 +1,7 @@
+# 0.1.10
+
+- Add the green wave favicon, multi-resolution ICO and Apple touch icon, including public HTML declarations and cache-versioned URLs.
+
 # 0.1.9
 
 - Overview now shows persistent cumulative upload/download rather than daily totals; period filters remain in statistics.

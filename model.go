@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-const Version = "0.1.9"
+const Version = "0.1.10"
 
 type Client struct {
 	RestorePending  bool   `json:"restorePending"`
