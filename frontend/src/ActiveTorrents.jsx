@@ -2,6 +2,7 @@ import React, { useLayoutEffect, useRef, useState } from "react";
 import { ArrowDown, ArrowUp } from "./icons.jsx";
 import { formatBytes } from "./units.js";
 import { siteColor } from "./site-chart.js";
+import { ColumnResizeHandle } from "./ColumnResizeHandle.jsx";
 
 const filters = [
   ["all", "count", "全部", "All"],
@@ -141,44 +142,31 @@ export function ActiveTorrents({ summary, rows, total, page, filter, changeFilte
                 <th key={label} scope="col">
                   {label}
                   {index < minimumWidths.length - 1 && (
-                    <span className={boundary === index ? "activity-resize dragging" : "activity-resize"}
-                      role="separator" tabIndex={0} aria-orientation="vertical"
-                      aria-label={t("调整列宽：", "Resize column: ") + label}
-                      aria-valuemin={0} aria-valuemax={ratios[index] + ratios[index + 1]}
-                      aria-valuenow={ratios[index]}
-                      onPointerDown={(event) => {
-                        if (saving || drag.current || event.button !== 0) return;
+                    <ColumnResizeHandle
+                      label={t("调整列宽：", "Resize column: ") + label}
+                      min={0} max={ratios[index] + ratios[index + 1]} value={ratios[index]}
+                      active={boundary === index}
+                      start={() => {
                         const extra = table.current.clientWidth - minimumTotal;
-                        if (extra <= 0) return;
-                        event.preventDefault();
-                        event.currentTarget.setPointerCapture(event.pointerId);
-                        drag.current = { x: event.clientX, ratios, extra, next: ratios };
+                        if (saving || drag.current || extra <= 0) return false;
+                        drag.current = { ratios, extra, next: ratios };
                         setBoundary(index);
                       }}
-                      onPointerMove={(event) => {
+                      move={(delta) => {
                         const current = drag.current;
-                        if (!current || !event.currentTarget.hasPointerCapture(event.pointerId)) return;
-                        current.next = resizePair(current.ratios, index, Math.round((event.clientX - current.x) * 10000 / current.extra));
+                        current.next = resizePair(current.ratios, index, Math.round(delta * 10000 / current.extra));
                         setPreview(current.next);
                       }}
-                      onPointerUp={(event) => {
-                        if (!drag.current || !event.currentTarget.hasPointerCapture(event.pointerId)) return;
+                      finish={(commit) => {
                         const { next, ratios: start } = drag.current;
                         drag.current = null;
                         setBoundary(null);
-                        if (next[index] !== start[index]) void persist(next);
+                        if (commit && next[index] !== start[index]) void persist(next);
                         else setPreview(null);
                       }}
-                      onLostPointerCapture={() => {
-                        if (!drag.current) return;
-                        drag.current = null;
-                        setBoundary(null);
-                        setPreview(null);
-                      }}
-                      onKeyDown={(event) => {
-                        if (saving || !["ArrowLeft", "ArrowRight"].includes(event.key)) return;
-                        event.preventDefault();
-                        const next = resizePair(ratios, index, event.key === "ArrowLeft" ? -200 : 200);
+                      step={(direction) => {
+                        if (saving || drag.current) return;
+                        const next = resizePair(ratios, index, direction * 200);
                         if (next[index] !== ratios[index]) void persist(next);
                       }}
                     />

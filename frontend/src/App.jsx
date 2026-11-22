@@ -28,10 +28,12 @@ import {
 import Chart from "chart.js/auto";
 import "./app.css";
 import { ActiveTorrents } from "./ActiveTorrents.jsx";
+import { ColumnResizeHandle } from "./ColumnResizeHandle.jsx";
 import { createID } from "./identity.js";
 import { buildSiteSeries, shortGapLines, siteColor } from "./site-chart.js";
 import { MB, GB, formatBytes as bytes, rateInput, rateBytes } from "./units.js";
 const id = createID;
+const drawerQuery = "(max-width: 1200px), (max-width: 1366px) and (pointer: coarse)";
 function demoData() {
   const now = Date.now() / 1000,
     sites = ["北辰站", "海湾站", "山海站"].map((name, i) => ({
@@ -491,7 +493,7 @@ export function App() {
     };
   }, [modal, busy]);
   useEffect(() => {
-    const mobile = matchMedia("(max-width: 1000px)");
+    const mobile = matchMedia(drawerQuery);
     const resize = (event) => {
       if (!event.matches) setMenu(false);
     };
@@ -506,7 +508,7 @@ export function App() {
     };
   }, []);
   useEffect(() => {
-    if (!modal && !(menu && matchMedia("(max-width: 1000px)").matches)) return;
+    if (!modal && !(menu && matchMedia(drawerQuery).matches)) return;
     const oldOverflow = document.body.style.overflow,
       oldPadding = document.body.style.paddingRight;
     const gap = innerWidth - document.documentElement.clientWidth;
@@ -1269,96 +1271,57 @@ export function App() {
   const torrentCount = data?.torrentTotal ?? visibleTorrents.length;
   const lastTorrentPage = Math.max(0, Math.ceil(torrentCount / 50) - 1);
   const currentTorrentPage = Math.min(torrentPage, lastTorrentPage);
+  const torrentLabels = [
+    ["种子名称", "Torrent name"], ["当前上传", "Upload rate"], ["当前限速", "Limit"],
+    ["状态", "State"], ["下载器", "Downloader"], ["站点", "Site"],
+    ["上传连接", "Connections"], ["Tracker", "Tracker"],
+  ].map(([zh, en]) => t(zh, en));
+  function resizeTorrentColumn(index, width) {
+    const next = Math.round(Math.min(1600, Math.max(index === 0 ? 180 : 70, width)));
+    setColumnWidths((widths) => widths.map((value, i) => i === index ? next : value));
+  }
   const torrents = (
     <div>
       <p className="hint">
         {t(
-          "拖动表头分隔线调整列宽；窄屏可左右滑动。列宽仅保存在此设备。",
-          "Drag header separators to resize columns; swipe horizontally on narrow screens. Widths stay on this device.",
+          "宽屏可拖动表头调整列宽，列宽保存在此设备。空间不足时自动切换为紧凑列表。",
+          "Drag header separators on wide screens. Widths stay on this device. Compact layouts switch to a list.",
         )}
       </p>
-      <div className="table-wrap">
+      <div className="table-wrap torrent-list">
         <table
           className="torrent-table"
-          style={{ minWidth: columnWidths.reduce((n, v) => n + v, 0) }}
+          role="table"
+          style={{ "--torrent-table-min": columnWidths.reduce((n, v) => n + v, 0) + "px" }}
         >
           <colgroup>
             {columnWidths.map((width, i) => (
               <col key={i} style={{ width }} />
             ))}
           </colgroup>
-          <thead>
-            <tr>
-              {[
-                ["种子名称", "Torrent name"],
-                ["当前上传", "Upload rate"],
-                ["当前限速", "Limit"],
-                ["状态", "State"],
-                ["下载器", "Downloader"],
-                ["站点", "Site"],
-                ["上传连接", "Connections"],
-                ["Tracker", "Tracker"],
-              ].map(([zh, en], i) => (
-                <th key={i} aria-label={t(zh, en)}>
-                  {t(zh, en)}
-                  <span
-                    className="column-handle"
-                    role="separator"
-                    aria-orientation="vertical"
-                    aria-label={t("调整列宽：", "Resize column: ") + t(zh, en)}
-                    aria-valuemin={i === 0 ? 180 : 70}
-                    aria-valuemax={1600}
-                    aria-valuenow={columnWidths[i]}
-                    tabIndex={0}
-                    onPointerDown={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      columnDrag.current = {
-                        index: i,
-                        x: e.clientX,
-                        width: columnWidths[i],
-                      };
-                      e.currentTarget.setPointerCapture(e.pointerId);
+          <thead role="rowgroup">
+            <tr role="row">
+              {torrentLabels.map((label, i) => (
+                <th key={i} scope="col">
+                  {label}
+                  <ColumnResizeHandle
+                    label={t("调整列宽：", "Resize column: ") + label}
+                    min={i === 0 ? 180 : 70} max={1600} value={columnWidths[i]}
+                    start={() => {
+                      columnDrag.current = columnWidths[i];
                     }}
-                    onPointerMove={(e) => {
-                      const d = columnDrag.current;
-                      if (!d || d.index !== i) return;
-                      const width = Math.min(
-                        1600,
-                        Math.max(i === 0 ? 180 : 70, d.width + e.clientX - d.x),
-                      );
-                      setColumnWidths((v) =>
-                        v.map((n, j) => (j === i ? width : n)),
-                      );
-                    }}
-                    onPointerUp={() => {
+                    move={(delta) => resizeTorrentColumn(i, columnDrag.current + delta)}
+                    finish={(commit) => {
+                      if (!commit) resizeTorrentColumn(i, columnDrag.current);
                       columnDrag.current = null;
                     }}
-                    onPointerCancel={() => {
-                      columnDrag.current = null;
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight")
-                        return;
-                      e.preventDefault();
-                      const delta = e.key === "ArrowLeft" ? -20 : 20;
-                      setColumnWidths((v) =>
-                        v.map((n, j) =>
-                          j === i
-                            ? Math.min(
-                                1600,
-                                Math.max(i === 0 ? 180 : 70, n + delta),
-                              )
-                            : n,
-                        ),
-                      );
-                    }}
+                    step={(direction) => resizeTorrentColumn(i, columnWidths[i] + direction * 20)}
                   />
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody>
+          <tbody role="rowgroup">
             {(serverPaged
               ? visibleTorrents
               : visibleTorrents.slice(
@@ -1369,16 +1332,17 @@ export function App() {
               <tr
                 key={x.key}
                 className="action-row"
+                role="row"
                 onClick={() => editTorrent(x)}
               >
                 <td className="name" title={x.name}>
-                  <span className="torrent-name">{x.name}</span>
+                  <button type="button" className="torrent-name">{x.name}</button>
                 </td>
-                <td className="up">{bytes(x.up, true)}</td>
-                <td>
+                <td className="up" data-label={torrentLabels[1]}>{bytes(x.up, true)}</td>
+                <td data-label={torrentLabels[2]}>
                   {x.limit ? bytes(x.limit, true) : t("不限速", "Unlimited")}
                 </td>
-                <td>
+                <td className="torrent-state" data-label={torrentLabels[3]}>
                   <span
                     className={"badge state " + (!x.managed ? "neutral" : "")}
                   >
@@ -1386,6 +1350,7 @@ export function App() {
                   </span>
                 </td>
                 <td
+                  data-label={torrentLabels[4]}
                   title={
                     c.clients.find((cl) => cl.id === x.client)?.name ||
                     x.client ||
@@ -1396,9 +1361,9 @@ export function App() {
                     x.client ||
                     "—"}
                 </td>
-                <td title={siteName(x.site)}>{siteName(x.site)}</td>
-                <td>{x.connections}</td>
-                <td title={(x.hosts || []).join(" · ")}>
+                <td data-label={torrentLabels[5]} title={siteName(x.site)}>{siteName(x.site)}</td>
+                <td data-label={torrentLabels[6]}>{x.connections}</td>
+                <td className="torrent-hosts" data-label={torrentLabels[7]} title={(x.hosts || []).join(" · ")}>
                   {(x.hosts || []).join(" · ") || t("暂不可用", "Unavailable")}
                 </td>
               </tr>
@@ -1633,12 +1598,27 @@ export function App() {
             className="section-tabs"
             role="tablist"
             aria-label={t("页面分类", "Page sections")}
+            onKeyDown={(event) => {
+              const index = tabs.findIndex(([key]) => key === page);
+              const next = {
+                ArrowLeft: (index + tabs.length - 1) % tabs.length,
+                ArrowRight: (index + 1) % tabs.length,
+                Home: 0,
+                End: tabs.length - 1,
+              }[event.key];
+              if (next === undefined || event.altKey || event.ctrlKey || event.metaKey) return;
+              event.preventDefault();
+              setPage(tabs[next][0]);
+              setSearch("");
+              event.currentTarget.querySelectorAll('[role="tab"]')[next]?.focus();
+            }}
           >
             {tabs.map(([key, label]) => (
               <button
                 key={key}
                 role="tab"
                 aria-selected={page === key}
+                tabIndex={page === key ? 0 : -1}
                 onClick={() => {
                   setPage(key);
                   setSearch("");
@@ -1669,11 +1649,7 @@ export function App() {
         ))}
         {[0, 1, 10].includes(page) && (
           <>
-            <div
-              className={
-                "toolbar filters " + (page === 0 ? "overview-filters" : "")
-              }
-            >
+            <div className="toolbar filters" hidden={page === 0}>
               {[1, 10].includes(page) && periods}
               {[1, 10].includes(page) && period === "week" && (
                 <div className="period-selector">
