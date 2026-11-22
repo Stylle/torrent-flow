@@ -1474,7 +1474,7 @@ input[type="checkbox"] {
   top: 0;
   z-index: 1;
 }
-.active-torrents .activity-table td { white-space: nowrap; padding-block: 7px; }
+.active-torrents .activity-table td { white-space: nowrap; padding-block: 5px; }
 .active-torrents .activity-table .activity-status { white-space: normal; }
 .activity-name button,
 .activity-name small {
@@ -1488,21 +1488,21 @@ input[type="checkbox"] {
   padding: 0;
   background: transparent;
   text-align: left;
-  min-height: 22px;
+  min-height: 20px;
   font-size: inherit;
   font-weight: 650;
   white-space: nowrap;
 }
 .activity-name button:hover { text-decoration: underline; }
-.activity-name small { color: var(--muted); margin-top: 3px; }
+.activity-name small { color: var(--muted); margin-top: 2px; }
 .download-progress {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 .download-progress progress {
-  width: clamp(44px, 6vw, 110px);
-  height: 7px;
+  width: clamp(64px, 8.5vw, 126px);
+  height: 9px;
   appearance: none;
   border: 0;
   border-radius: 9px;
@@ -1516,12 +1516,12 @@ input[type="checkbox"] {
 .activity-status::before {
   content: "";
   display: inline-block;
-  width: 6px;
-  height: 6px;
-  margin-inline-end: 6px;
+  width: 8px;
+  height: 8px;
+  margin-inline-end: 7px;
   border-radius: 50%;
   background: var(--muted);
-  vertical-align: 2px;
+  vertical-align: 1px;
 }
 .activity-status.allocated::before { background: var(--teal); }
 .activity-status.downloading::before { background: var(--blue); }
@@ -1550,9 +1550,9 @@ input[type="checkbox"] {
   .activity-table tbody tr {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 8px;
+    gap: 6px 8px;
     border-bottom: 1px solid var(--line);
-    padding: 11px 0;
+    padding: 8px 0;
   }
   .active-torrents .activity-table td { padding: 0; border: 0; min-width: 0; }
   .activity-table .activity-name { width: auto; max-width: none; grid-column: span 2; }
