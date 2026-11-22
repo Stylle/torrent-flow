@@ -51,7 +51,7 @@ function demoData() {
       afterTarget: MB,
     }));
   return {
-    version: "0.1.15",
+    version: "0.1.16",
     catalog: {
       sites: 329,
       domains: 780,
@@ -1586,7 +1586,7 @@ export function App() {
           <br />v{data.version} · MIT License
         </div>
       </aside>
-      <main className="main">
+      <main className={page === 0 ? "main overview-page" : "main"}>
         <header className="topbar">
           <button
             className="icon menu-toggle"
@@ -1909,11 +1909,6 @@ export function App() {
                 </div>
               ))}
             </div>
-            {page === 0 && (
-              <small className="muted">
-                {t("累计自已采集历史持续增加，不随每日切换或明细清理归零。", "Totals accumulate recorded history and survive daily rollover and detail expiry.")}
-              </small>
-            )}
             {totals.uncertain && (
               <div className="notice">
                 {t(

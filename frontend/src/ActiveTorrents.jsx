@@ -104,8 +104,10 @@ export function ActiveTorrents({ summary, rows, total, page, filter, changeFilte
               return (
                 <tr key={row.key} role="row">
                   <td className="activity-name">
+                    <div className="activity-identity">
                     <button type="button" onClick={() => editTorrent(row)} title={row.name}>{row.name}</button>
                     <small title={[source, ...(row.hosts || [])].join(" · ")}>{source}</small>
+                    </div>
                   </td>
                   <ActivityValue label={progressLabel} className="activity-progress">
                     {progress === null ? "—" : (
