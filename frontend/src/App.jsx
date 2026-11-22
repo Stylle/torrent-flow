@@ -28,7 +28,7 @@ import {
 import Chart from "chart.js/auto";
 import "./app.css";
 import { createID } from "./identity.js";
-import { buildSiteSeries, siteColor } from "./site-chart.js";
+import { buildSiteSeries, shortGapLines, siteColor } from "./site-chart.js";
 import { MB, GB, formatBytes as bytes, rateInput, rateBytes } from "./units.js";
 const id = createID;
 function demoData() {
@@ -50,7 +50,7 @@ function demoData() {
       afterTarget: MB,
     }));
   return {
-    version: "0.1.13",
+    version: "0.1.14",
     catalog: {
       sites: 329,
       domains: 780,
@@ -162,10 +162,14 @@ function Plot({
   bars = false,
   dark,
   sites,
+  timeZone,
   metric = "up",
   rangeSeconds = 1800,
+  pollSeconds = 5,
+  gapLabel,
 }) {
   const ref = useRef();
+  const chartRef = useRef();
   const [hidden, setHidden] = useState([]);
   const series = useMemo(
     () =>
@@ -173,39 +177,15 @@ function Plot({
         bars,
         metric,
         sampleStep: Math.max(15, Math.floor(rangeSeconds / 480)),
+        sampleEvery: pollSeconds * Math.ceil(15 / pollSeconds),
       }),
-    [data, sites, bars, metric, rangeSeconds],
+    [data, sites, bars, metric, rangeSeconds, pollSeconds],
   );
   useEffect(() => {
-    const css = getComputedStyle(document.documentElement),
-      muted = css.getPropertyValue("--muted").trim(),
-      line = css.getPropertyValue("--line").trim();
     const chart = new Chart(ref.current, {
       type: bars ? "bar" : "line",
-      data: {
-        labels: series.times.map((time) =>
-          new Date(time * 1000).toLocaleString(
-            undefined,
-            bars && rangeSeconds > 172800
-              ? { month: "numeric", day: "numeric" }
-              : { hour: "2-digit", minute: "2-digit" },
-          ),
-        ),
-        datasets: series.datasets.map((s) => ({
-          label: s.label,
-          data: bars
-            ? s.data
-            : s.data.map((value, i) => ({ x: series.times[i], y: value })),
-          borderColor: s.color,
-          backgroundColor: s.color,
-          borderWidth: bars ? 0 : 2,
-          pointRadius: series.times.length === 1 ? 3 : 0,
-          tension: 0.15,
-          fill: false,
-          spanGaps: false,
-          hidden: hidden.includes(s.id),
-        })),
-      },
+      data: { labels: [], datasets: [] },
+      plugins: bars ? [] : [shortGapLines],
       options: {
         responsive: true,
         maintainAspectRatio: false,
@@ -220,7 +200,7 @@ function Plot({
                   ? items[0]?.label
                   : new Date((items[0]?.parsed.x || 0) * 1000).toLocaleString(),
               label: (ctx) => {
-                const total = ctx.chart.data.datasets.reduce(
+                const total = bars && ctx.chart.data.datasets.reduce(
                   (n, ds, i) =>
                     n +
                     (ctx.chart.isDatasetVisible(i)
@@ -239,16 +219,21 @@ function Plot({
             stacked: bars,
             grid: { display: false },
             ticks: {
-              color: muted,
               maxTicksLimit: 8,
               maxRotation: 0,
               ...(bars
                 ? {}
                 : {
-                    callback: (value) =>
+                    callback: (value, _index, ticks) =>
                       new Date(Number(value) * 1000).toLocaleTimeString(
                         undefined,
-                        { hour: "2-digit", minute: "2-digit" },
+                        {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                          ...(ticks[1]?.value - ticks[0]?.value < 60
+                            ? { second: "2-digit" }
+                            : {}),
+                        },
                       ),
                   }),
             },
@@ -256,14 +241,66 @@ function Plot({
           y: {
             stacked: bars,
             beginAtZero: true,
-            grid: { color: line },
-            ticks: { color: muted, callback: (v) => bytes(v, !bars) },
+            ...(bars ? {} : { grace: "8%" }),
+            grid: {},
+            ticks: { callback: (v) => bytes(v, !bars) },
           },
         },
       },
     });
-    return () => chart.destroy();
-  }, [series, bars, dark, hidden, rangeSeconds]);
+    chartRef.current = chart;
+    return () => {
+      chart.destroy();
+      chartRef.current = undefined;
+    };
+  }, [bars]);
+  useEffect(() => {
+    const chart = chartRef.current;
+    const css = getComputedStyle(document.documentElement);
+    const muted = css.getPropertyValue("--muted").trim();
+    chart.options.scales.x.ticks.color = muted;
+    chart.options.scales.y.ticks.color = muted;
+    chart.options.scales.y.grid.color = css.getPropertyValue("--line").trim();
+    if (bars) {
+      const format = new Intl.DateTimeFormat(undefined, {
+        timeZone,
+        ...(rangeSeconds > 100 * 86400
+          ? { month: "short", year: "numeric" }
+          : rangeSeconds > 25 * 3600
+            ? { month: "numeric", day: "numeric" }
+            : { hour: "2-digit", minute: "2-digit" }),
+      });
+      chart.data.labels = series.times.map((time) => format.format(time * 1000));
+    }
+    const previous = new Map(chart.data.datasets.map((dataset) => [dataset.siteId, dataset]));
+    chart.data.datasets = series.datasets.map((site) =>
+      Object.assign(previous.get(site.id) ?? {}, {
+        siteId: site.id,
+        label: site.label,
+        data: bars
+          ? site.data
+          : site.data.map((value, i) => ({ x: series.times[i], y: value })),
+        borderColor: site.color,
+        backgroundColor: site.color,
+        hidden: hidden.includes(site.id),
+        ...(bars
+          ? { borderWidth: 0, borderRadius: 4, maxBarThickness: 48 }
+          : {
+              borderWidth: 2,
+              cubicInterpolationMode: "monotone",
+              pointRadius: ({ dataIndex }) => {
+                if (site.data[dataIndex] == null) return 0;
+                return site.data[dataIndex - 1] == null && site.data[dataIndex + 1] == null ? 2.5 : 0;
+              },
+              pointHoverRadius: 4,
+              bridges: site.bridges,
+            }),
+      }),
+    );
+    // Chart.js replays the last pointer event on update, keeping the tooltip
+    // open while refreshed data is drawn beneath a stationary cursor.
+    chart.update("none");
+  }, [series, bars, dark, hidden, rangeSeconds, timeZone]);
   return (
     <div>
       <div className="chart">
@@ -275,6 +312,9 @@ function Plot({
           data-stacked={bars}
         />
       </div>
+      {!bars && series.datasets.some((site) => !hidden.includes(site.id) && site.bridges.length > 0) && (
+        <small className="chart-gap-note">{gapLabel}</small>
+      )}
       <div className="chart-legend">
         {series.datasets.map((s) => (
           <button
@@ -1946,6 +1986,8 @@ export function App() {
                   dark={dark}
                   metric={speedMetric}
                   rangeSeconds={speedWindow}
+                  pollSeconds={c.pollSeconds}
+                  gapLabel={t("虚线连接短暂缺采，较长缺口保留。", "Dashed lines bridge brief sampling gaps. Longer gaps stay open.")}
                 />
               ) : (
                 <div className="empty">
@@ -2121,6 +2163,7 @@ export function App() {
                   sites={c.sites}
                   metric={trafficMetric}
                   rangeSeconds={data.end - data.start}
+                  timeZone={c.timezone}
                   dark={dark}
                 />
               ) : (

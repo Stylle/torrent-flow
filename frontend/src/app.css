@@ -292,6 +292,7 @@ h3 {
 .chart {
   position: relative;
   height: 240px;
+  overflow: hidden;
 }
 .split {
   display: grid;
@@ -1267,6 +1268,11 @@ td {
   max-height: 100px;
   overflow: auto;
   margin-top: 12px;
+}
+.chart-gap-note {
+  display: block;
+  margin-top: 8px;
+  color: var(--muted);
 }
 .chart-legend button {
   display: flex;

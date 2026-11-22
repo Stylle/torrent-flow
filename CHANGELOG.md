@@ -1,3 +1,9 @@
+# 0.1.14
+
+- Keep hover tooltips visible and update their values as the rate and traffic charts refresh.
+- Bridge brief rate sampling gaps with dashed lines, retain longer gaps, and show seconds on closely spaced time ticks.
+- Refine stacked traffic bars and chart resizing on smaller screens.
+
 # 0.1.13
 
 - Add an optional sustained-upload setting based on growth in cumulative uploaded bytes across consecutive samples. Connected peers with no upload traffic no longer consume an allocation when this setting is enabled.

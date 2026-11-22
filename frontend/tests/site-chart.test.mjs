@@ -54,4 +54,31 @@ test("a global offline interval breaks every line", () => {
   );
   assert.deepEqual(r.times, [100, 115, 160]);
   assert.deepEqual(r.datasets[0].data, [10, null, 20]);
+  assert.deepEqual(r.datasets[0].bridges, []);
+});
+
+test("brief jitter bridges actual endpoints without adding tooltip samples", () => {
+  const r = buildSiteSeries(
+    [
+      { time: 0, site: "a", up: 10 },
+      { time: 15, site: "b", up: 4 },
+      { time: 30, site: "a", up: 0 },
+      { time: 90, site: "a", up: 8 },
+    ],
+    [],
+  );
+  assert.deepEqual(r.times, [0, 15, 30, 45, 90]);
+  assert.deepEqual(r.datasets[0].data, [10, null, 0, null, 8]);
+  assert.deepEqual(r.datasets[0].bridges, [[0, 2]]);
+  assert.deepEqual(r.datasets[1].bridges, []);
+});
+
+test("bridge limit follows the configured sampling cadence", () => {
+  const rows = [
+    { time: 0, site: "a", up: 3 },
+    { time: 45, site: "a", up: 5 },
+    { time: 105, site: "a", up: 2 },
+  ];
+  const result = buildSiteSeries(rows, [], { sampleEvery: 30 });
+  assert.deepEqual(result.datasets[0].bridges, [[0, 2]]);
 });
