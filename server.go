@@ -363,6 +363,18 @@ func (sv *Server) snapshot(w http.ResponseWriter, r *http.Request) {
 		payload["diagnostics"] = entries
 		payload["diagnosticsUnavailable"] = err != nil
 	}
+	if r.URL.Query().Get("view") == "overview" {
+		rows, summary := activeTorrents(torrents, c, r.URL.Query().Get("activity"))
+		offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+		offset = min(max(0, offset)/50, max(0, (len(rows)-1)/50)) * 50
+		payload["lifetime"] = lifetime
+		payload["activity"] = summary
+		payload["torrentTotal"] = len(rows)
+		payload["torrentOffset"] = offset
+		payload["torrents"] = rows[offset:min(len(rows), offset+50)]
+		jsonOut(w, payload)
+		return
+	}
 	if r.URL.Query().Get("view") == "active" {
 		payload["lifetime"] = lifetime
 		downloads := []Torrent{}

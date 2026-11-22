@@ -60,3 +60,60 @@ func TestDownloadSnapshotSeparateBoundedPagination(t *testing.T) {
 		t.Fatal("tracker path leaked")
 	}
 }
+
+func TestUnifiedActivitySnapshot(t *testing.T) {
+	s := testStore(t)
+	c, err := s.config()
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.UploadConfirmSeconds = 15
+	c.Clients = []Client{{ID: "qb", Enabled: true}}
+	if err := s.saveConfig(c); err != nil {
+		t.Fatal(err)
+	}
+	e := newEngine(s)
+	e.torrents = []Torrent{
+		{Key: "both", Client: "qb", Downloading: true, Down: 200, Up: 60, Managed: true, UploadQualified: true},
+		{Key: "waiting", Client: "qb", Downloading: true},
+		{Key: "confirm", Client: "qb", State: "monitoring", UploadObserved: true, Trackers: []string{"https://a.example/secret"}},
+		{Key: "recover", Client: "qb", State: "release pending"},
+		{Key: "idle", Client: "qb", Connections: 2},
+	}
+	for i := 0; i < 50; i++ {
+		e.torrents = append(e.torrents, Torrent{Key: randomID(), Client: "qb", Downloading: true, Down: 1})
+	}
+	sv := &Server{s: s, e: e}
+	get := func(query string) (v struct {
+		Summary activeTorrentSummary `json:"activity"`
+		Rows    []activeTorrent      `json:"torrents"`
+		Total   int                  `json:"torrentTotal"`
+		Offset  int                  `json:"torrentOffset"`
+	}) {
+		t.Helper()
+		w := httptest.NewRecorder()
+		sv.snapshot(w, httptest.NewRequest("GET", "/api/snapshot?view=overview"+query, nil))
+		if w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &v) != nil || strings.Contains(w.Body.String(), "secret") {
+			t.Fatal("invalid activity snapshot")
+		}
+		return v
+	}
+	all := get("")
+	want := activeTorrentSummary{Count: 54, Downloading: 52, Uploading: 2, Up: 60, Down: 250}
+	if all.Summary != want || all.Total != 54 || len(all.Rows) != 50 || all.Rows[0].Key != "both" {
+		t.Fatalf("wrong activity totals or ordering: %+v", all.Summary)
+	}
+	upload := get("&activity=uploading&offset=50")
+	if upload.Summary != want || upload.Offset != 0 || len(upload.Rows) != 2 ||
+		upload.Rows[0].Key != "both" || !upload.Rows[1].AwaitingUpload {
+		t.Fatal("upload filter did not retain overlap or confirmation state")
+	}
+	download := get("&activity=downloading&offset=50")
+	if download.Total != 52 || download.Offset != 50 || len(download.Rows) != 2 || download.Rows[1].Key != "waiting" {
+		t.Fatal("download filter or last page lost an active download")
+	}
+	tail := get("&offset=50")
+	if len(tail.Rows) != 4 {
+		t.Fatalf("last page returned %d rows", len(tail.Rows))
+	}
+}

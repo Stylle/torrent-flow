@@ -1,3 +1,8 @@
+# 0.1.15
+
+- Merge downloads and upload allocation into a single paginated Active torrents list with overlapping download/upload filters.
+- Show download progress, observed rates, managed limits and waiting/recovery states together on desktop and mobile.
+
 # 0.1.14
 
 - Keep hover tooltips visible and update their values as the rate and traffic charts refresh.

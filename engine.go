@@ -185,6 +185,7 @@ func (e *Engine) tick(ctx context.Context) {
 				observation := observeUpload(e.uploadActivity[items[i].Key], a, items[i], sampledAt, c)
 				nextUploadActivity[items[i].Key] = observation
 				items[i].UploadQualified = observation.qualified
+				items[i].UploadObserved = observation.lastGrowth.Equal(sampledAt)
 			}
 			items[i].Site, items[i].Ambiguous = siteFor(items[i], c)
 			if items[i].Site == "" {

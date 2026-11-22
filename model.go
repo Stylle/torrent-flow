@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-const Version = "0.1.14"
+const Version = "0.1.15"
 
 type Client struct {
 	RestorePending  bool   `json:"restorePending"`
@@ -98,6 +98,7 @@ type Torrent struct {
 	Added       int64    `json:"-"`
 
 	UploadQualified bool `json:"uploadQualified,omitempty"`
+	UploadObserved  bool `json:"-"`
 }
 type ClientStatus struct {
 	ID              string `json:"id"`

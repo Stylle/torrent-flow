@@ -27,6 +27,7 @@ import {
 } from "./icons.jsx";
 import Chart from "chart.js/auto";
 import "./app.css";
+import { ActiveTorrents } from "./ActiveTorrents.jsx";
 import { createID } from "./identity.js";
 import { buildSiteSeries, shortGapLines, siteColor } from "./site-chart.js";
 import { MB, GB, formatBytes as bytes, rateInput, rateBytes } from "./units.js";
@@ -50,7 +51,7 @@ function demoData() {
       afterTarget: MB,
     }));
   return {
-    version: "0.1.14",
+    version: "0.1.15",
     catalog: {
       sites: 329,
       domains: 780,
@@ -359,7 +360,7 @@ export function App() {
     [csrf, setCsrf] = useState(""),
     [page, setPage] = useState(0),
     [torrentPage, setTorrentPage] = useState(0),
-    [downloadPage, setDownloadPage] = useState(0),
+    [activityFilter, setActivityFilter] = useState("all"),
     [menu, setMenu] = useState(false),
     [period, setPeriod] = useState("day"),
     [speedWindow, setSpeedWindow] = useState(1800),
@@ -538,7 +539,7 @@ export function App() {
   async function refresh() {
     if (!demo) {
       const v = await api(
-        `snapshot?period=${[1, 10].includes(page) ? period : "day"}&date=${[1, 10].includes(page) ? date : new Date().toLocaleDateString("en-CA")}&window=${speedWindow}&group=${page === 10 ? "downloaders" : "sites"}&view=${page === 0 ? "active" : page === 8 ? "all" : page === 11 ? "logs" : "none"}&downloadOffset=${downloadPage * 50}&offset=${torrentPage * 50}&search=${encodeURIComponent(page === 8 ? search : "")}`,
+        `snapshot?period=${[1, 10].includes(page) ? period : "day"}&date=${[1, 10].includes(page) ? date : new Date().toLocaleDateString("en-CA")}&window=${speedWindow}&group=${page === 10 ? "downloaders" : "sites"}&view=${page === 0 ? "overview" : page === 8 ? "all" : page === 11 ? "logs" : "none"}&activity=${activityFilter}&offset=${torrentPage * 50}&search=${encodeURIComponent(page === 8 ? search : "")}`,
       );
       setData(v);
     }
@@ -552,7 +553,7 @@ export function App() {
       inFlight = true;
       try {
         const v = await api(
-          `snapshot?period=${[1, 10].includes(page) ? period : "day"}&date=${[1, 10].includes(page) ? date : new Date().toLocaleDateString("en-CA")}&window=${speedWindow}&group=${page === 10 ? "downloaders" : "sites"}&view=${page === 0 ? "active" : page === 8 ? "all" : page === 11 ? "logs" : "none"}&downloadOffset=${downloadPage * 50}&offset=${torrentPage * 50}&search=${encodeURIComponent(page === 8 ? search : "")}`,
+          `snapshot?period=${[1, 10].includes(page) ? period : "day"}&date=${[1, 10].includes(page) ? date : new Date().toLocaleDateString("en-CA")}&window=${speedWindow}&group=${page === 10 ? "downloaders" : "sites"}&view=${page === 0 ? "overview" : page === 8 ? "all" : page === 11 ? "logs" : "none"}&activity=${activityFilter}&offset=${torrentPage * 50}&search=${encodeURIComponent(page === 8 ? search : "")}`,
         );
         if (alive) {
           setData(v);
@@ -576,7 +577,7 @@ export function App() {
     date,
     page,
     torrentPage,
-    downloadPage,
+    activityFilter,
     search,
     speedWindow,
   ]);
@@ -1242,26 +1243,22 @@ export function App() {
       monitoring: t("监控中", "Monitoring"),
       "release pending": t("恢复待重试", "Recovery pending"),
     })[v] || v;
+  const editTorrent = (row) =>
+    open("torrent", {
+      key: row.key, name: row.name, site: row.site,
+      weight: c.overrides[row.key]?.weight || 1,
+      manage: c.overrides[row.key]?.manage ?? !!c.clients.find((cl) => cl.id === row.client)?.autoManage,
+    });
   const serverPaged = data?.torrentTotal !== undefined;
   const visibleTorrents = (data?.torrents || []).filter(
     (x) =>
-      (serverPaged ||
+      serverPaged ||
         page !== 8 ||
         !search ||
         x.name.toLowerCase().includes(search.toLowerCase()) ||
         (x.hosts || []).some((h) =>
           h.toLowerCase().includes(search.toLowerCase()),
-        )) &&
-      (serverPaged || page !== 0 || x.connections > 0 || x.up > 0),
-  );
-  const downloading =
-    data?.downloading ||
-    (demo
-      ? data.torrents.filter((row) => row.downloading || row.down > 0)
-      : []);
-  const downloadTotal = data?.downloadingTotal ?? downloading.length;
-  const downloadCurrent = Math.floor(
-    (data?.downloadOffset ?? downloadPage * 50) / 50,
+        ),
   );
   const torrentCount = data?.torrentTotal ?? visibleTorrents.length;
   const lastTorrentPage = Math.max(0, Math.ceil(torrentCount / 50) - 1);
@@ -1366,17 +1363,7 @@ export function App() {
               <tr
                 key={x.key}
                 className="action-row"
-                onClick={() =>
-                  open("torrent", {
-                    key: x.key,
-                    name: x.name,
-                    site: x.site,
-                    weight: c.overrides[x.key]?.weight || 1,
-                    manage:
-                      c.overrides[x.key]?.manage ??
-                      !!c.clients.find((cl) => cl.id === x.client)?.autoManage,
-                  })
-                }
+                onClick={() => editTorrent(x)}
               >
                 <td className="name" title={x.name}>
                   <span className="torrent-name">{x.name}</span>
@@ -1998,148 +1985,23 @@ export function App() {
                 </div>
               )}
             </section>
-            <section className="card downloading-card">
-              <div className="section-head">
-                <div>
-                  <h2>{t("正在下载", "Downloading")}</h2>
-                  <small>
-                    {downloadTotal} {t("个种子", "torrents")} · ↓{" "}
-                    {bytes(
-                      data.downloadRate ??
-                        downloading.reduce(
-                          (sum, row) => sum + (row.down || 0),
-                          0,
-                        ),
-                      true,
-                    )}
-                  </small>
-                </div>
-              </div>
-              {!downloading.length ? (
-                <div className="empty">
-                  {t("暂无正在下载的种子", "No torrents downloading")}
-                </div>
-              ) : (
-                <div className="table-wrap">
-                  <table className="download-table">
-                    <thead>
-                      <tr>
-                        {[
-                          t("种子名称", "Torrent name"),
-                          t("当前下载", "Download rate"),
-                          t("进度", "Progress"),
-                          t("下载器", "Downloader"),
-                          t("站点", "Site"),
-                          t("当前上传", "Upload rate"),
-                        ].map((label) => (
-                          <th key={label}>{label}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {downloading.map((row) => (
-                        <tr key={row.key}>
-                          <td title={row.name}>
-                            <span className="download-name">{row.name}</span>
-                          </td>
-                          <td className="down">{bytes(row.down, true)}</td>
-                          <td>
-                            {typeof row.progress === "number" ? (
-                              <div className="download-progress">
-                                <progress
-                                  max="1"
-                                  value={Math.max(0, Math.min(1, row.progress))}
-                                />
-                                <small>
-                                  {(
-                                    Math.max(0, Math.min(1, row.progress)) * 100
-                                  ).toFixed(1)}
-                                  %
-                                </small>
-                              </div>
-                            ) : (
-                              "—"
-                            )}
-                          </td>
-                          <td>
-                            {c.clients.find((cl) => cl.id === row.client)
-                              ?.name || "—"}
-                          </td>
-                          <td>{siteName(row.site)}</td>
-                          <td className="up">{bytes(row.up, true)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-              {downloadTotal > 50 && (
-                <div className="pagination">
-                  <button
-                    disabled={downloadCurrent === 0}
-                    onClick={() => setDownloadPage(downloadCurrent - 1)}
-                  >
-                    {t("上一页", "Previous")}
-                  </button>
-                  <small>
-                    {downloadCurrent + 1} / {Math.ceil(downloadTotal / 50)}
-                  </small>
-                  <button
-                    disabled={(downloadCurrent + 1) * 50 >= downloadTotal}
-                    onClick={() => setDownloadPage(downloadCurrent + 1)}
-                  >
-                    {t("下一页", "Next")}
-                  </button>
-                </div>
-              )}
-              <p className="hint">
-                {t(
-                  "包含正在下载或等待数据的运行中任务；暂停和仅做种任务不显示。",
-                  "Includes running downloads waiting for data. Paused and seeding-only tasks are excluded.",
-                )}
-              </p>
-            </section>
-            <section className="card allocation-card">
-              <div className="section-head">
-                <div>
-                  <h2>{t("动态带宽分配", "Dynamic bandwidth")}</h2>
-                  {guard}
-                  <div className="allocation-summary">
-                    <span>
-                      {t("活跃种子", "Active torrents")}{" "}
-                      <strong>
-                        {data.activeSummary?.count ?? torrentCount}
-                      </strong>
-                    </span>
-                    <span>
-                      {t("当前上传", "Current upload")}{" "}
-                      <strong className="up">
-                        {bytes(data.activeSummary?.up ?? speed, true)}
-                      </strong>
-                    </span>
-                    {data.activeSummary && (
-                      <span>
-                        {t("已分配额度", "Allocated allowance")}{" "}
-                        <strong>{bytes(data.activeSummary.limit, true)}</strong>
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-              {torrents}
-              <p className="hint">
-                <Info size={15} />
-                {c.uploadConfirmSeconds > 0
-                  ? t(
-                      `累计上传字节在连续采样间隔内增长，确认至少 ${c.uploadConfirmSeconds} 秒后参与分配。`,
-                      `Torrents qualify after at least ${c.uploadConfirmSeconds} seconds of growth across consecutive upload samples.`,
-                    )
-                  : t(
-                      "显示有上传连接或正在上传的种子，包括待分配和操作失败项；自动策略由各下载器独立控制。",
-                      "Shows torrents with upload connections or actual uploads, including pending and failed operations. Each downloader controls its own strategy.",
-                    )}
-              </p>
-            </section>
+            <ActiveTorrents
+              summary={data.activity}
+              rows={data.activity || demo ? data.torrents : []}
+              total={demo ? undefined : data.activity ? data.torrentTotal : 0}
+              page={demo ? torrentPage : Math.floor((data.torrentOffset || 0) / 50)}
+              filter={activityFilter}
+              changeFilter={(filter) => {
+                setActivityFilter(filter);
+                setTorrentPage(0);
+              }}
+              changePage={setTorrentPage}
+              clients={c.clients}
+              siteName={siteName}
+              guard={guard}
+              editTorrent={editTorrent}
+              t={t}
+            />
           </>
         )}
         {page === 1 && (
