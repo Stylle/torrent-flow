@@ -57,6 +57,8 @@ export function ActiveTorrents({ summary, rows, total, page, filter, changeFilte
   const uploadLabel = t("上传速度", "Upload rate");
   const limitLabel = t("分配限速", "Allocated limit");
   const progressLabel = t("下载进度", "Progress");
+  const downloaderLabel = t("下载器", "Downloader");
+  const siteLabel = t("站点", "Site");
   const connectionsLabel = t("上传连接", "Upload peers");
   const clientNames = new Map(clients.map((client) => [client.id, client.name]));
   const rate = (value) => value > 0 ? formatBytes(value, true) : "—";
@@ -89,25 +91,26 @@ export function ActiveTorrents({ summary, rows, total, page, filter, changeFilte
               <col />
               <col />
               <col />
+              <col />
+              <col />
+              <col />
               <col className="activity-peers-col" />
               <col className="activity-status-col" />
             </colgroup>
             <thead role="rowgroup"><tr role="row">
-              {[t("种子名称", "Torrent name"), progressLabel, downloadLabel, uploadLabel, limitLabel, connectionsLabel, t("状态", "Status")].map((label) =>
+              {[t("种子名称", "Torrent name"), progressLabel, downloaderLabel, downloadLabel, uploadLabel, siteLabel, limitLabel, connectionsLabel, t("状态", "Status")].map((label) =>
                 <th key={label} scope="col">{label}</th>
               )}
             </tr></thead>
             <tbody role="rowgroup">{rows.map((row) => {
               const progress = typeof row.progress === "number" ? Math.min(1, Math.max(0, row.progress)) : null;
-              const source = [clientNames.get(row.client) || row.client, siteName(row.site)].filter(Boolean).join(" · ");
+              const downloader = clientNames.get(row.client) || row.client;
+              const site = siteName(row.site);
               const status = uploadStatus(row, t);
               return (
                 <tr key={row.key} role="row">
                   <td className="activity-name">
-                    <div className="activity-identity">
                     <button type="button" onClick={() => editTorrent(row)} title={row.name}>{row.name}</button>
-                    <small title={[source, ...(row.hosts || [])].join(" · ")}>{source}</small>
-                    </div>
                   </td>
                   <ActivityValue label={progressLabel} className="activity-progress">
                     {progress === null ? "—" : (
@@ -117,8 +120,14 @@ export function ActiveTorrents({ summary, rows, total, page, filter, changeFilte
                       </div>
                     )}
                   </ActivityValue>
+                  <ActivityValue label={downloaderLabel}>
+                    <span className="activity-cell-text" title={downloader}>{downloader || "—"}</span>
+                  </ActivityValue>
                   <ActivityValue label={downloadLabel} className="activity-download">{rate(row.down)}</ActivityValue>
                   <ActivityValue label={uploadLabel} className="activity-upload">{rate(row.up)}</ActivityValue>
+                  <ActivityValue label={siteLabel}>
+                    <span className="activity-cell-text" title={[site, ...(row.hosts || [])].filter(Boolean).join(" · ")}>{site || "—"}</span>
+                  </ActivityValue>
                   <ActivityValue label={limitLabel} className="activity-limit">{row.managed ? rate(row.limit) : "—"}</ActivityValue>
                   <ActivityValue label={connectionsLabel} className="activity-peers">{row.connections}</ActivityValue>
                   <td className={`activity-status ${status?.[0] || (row.down > 0 ? "downloading" : "neutral")}`} title={row.state}>

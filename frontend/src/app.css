@@ -1463,11 +1463,11 @@ input[type="checkbox"] {
 }
 .activity-filters button span { margin-inline-start: 3px; }
 .activity-list { max-height: calc(38px + 8 * 46px); }
-.activity-table { table-layout: fixed; font-size: 14px; }
+.activity-table { table-layout: fixed; font-size: 14px; min-width: 1040px; }
 .activity-name-col { width: 23%; }
-.activity-progress-col { width: 19%; }
-.activity-peers-col { width: 10%; }
-.activity-status-col { width: 16%; }
+.activity-progress-col { width: 13%; }
+.activity-peers-col { width: 9%; }
+.activity-status-col { width: 12%; }
 .activity-table th {
   background: var(--surface);
   position: sticky;
@@ -1477,7 +1477,7 @@ input[type="checkbox"] {
 .active-torrents .activity-table td { white-space: nowrap; padding-block: 5px; }
 .active-torrents .activity-table .activity-status { white-space: normal; }
 .activity-name button,
-.activity-name small {
+.activity-cell-text {
   display: block;
   text-overflow: ellipsis;
   overflow: hidden;
@@ -1494,7 +1494,6 @@ input[type="checkbox"] {
   white-space: nowrap;
 }
 .activity-name button:hover { text-decoration: underline; }
-.activity-name small { color: var(--muted); margin-top: 2px; }
 .download-progress {
   display: flex;
   align-items: center;
@@ -1502,6 +1501,7 @@ input[type="checkbox"] {
 }
 .download-progress progress {
   width: clamp(64px, 8.5vw, 126px);
+  min-width: 0;
   height: 9px;
   appearance: none;
   border: 0;
@@ -1539,18 +1539,14 @@ input[type="checkbox"] {
   .overview-page .active-torrents { margin-bottom: 0; }
 }
 @media (min-width: 1500px) {
-  .activity-name-col { width: 31%; }
-  .activity-progress-col { width: 15%; }
-  .activity-identity { display: flex; align-items: baseline; gap: 10px; }
-  .activity-identity button { min-width: 0; }
-  .activity-identity small { flex: 0 0 auto; max-width: 44%; margin: 0; }
+  .activity-name-col { width: 26%; }
   .active-torrents .activity-table td { height: 38px; }
   .activity-list { max-height: calc(38px + 8 * 38px); }
 }
 @media (max-width: 760px) {
   .activity-rates { column-gap: 10px; row-gap: 6px; }
   .activity-list { max-height: none; }
-  .activity-table { display: block; }
+  .activity-table { display: block; min-width: 0; }
   .activity-table colgroup { display: none; }
   .activity-table thead {
     position: absolute;
@@ -1577,7 +1573,6 @@ input[type="checkbox"] {
     font-size: 12px;
   }
   .activity-progress { grid-column: span 2; }
-  .activity-peers { grid-column: 3; grid-row: 2; }
   .activity-field-label { display: block; color: var(--muted); font-size: 11px; }
 }
 @media (max-width: 420px) {
