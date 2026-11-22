@@ -1,6 +1,7 @@
 import React from "react";
 import { ArrowDown, ArrowUp } from "./icons.jsx";
 import { formatBytes } from "./units.js";
+import { siteColor } from "./site-chart.js";
 
 const filters = [
   ["all", "count", "全部", "All"],
@@ -44,7 +45,7 @@ function ActivityValue({ label, className, children }) {
   );
 }
 
-export function ActiveTorrents({ summary, rows, total, page, filter, changeFilter, changePage, clients, siteName, guard, editTorrent, t }) {
+export function ActiveTorrents({ summary, rows, total, page, filter, changeFilter, changePage, clients, sites, siteName, guard, editTorrent, t }) {
   if (!summary) {
     const demo = demoActivity(rows);
     summary = demo.summary;
@@ -121,12 +122,17 @@ export function ActiveTorrents({ summary, rows, total, page, filter, changeFilte
                     )}
                   </ActivityValue>
                   <ActivityValue label={downloaderLabel}>
-                    <span className="activity-cell-text" title={downloader}>{downloader || "—"}</span>
+                    <span className="activity-cell-text activity-downloader" title={downloader}>{downloader || "—"}</span>
                   </ActivityValue>
-                  <ActivityValue label={downloadLabel} className="activity-download">{rate(row.down)}</ActivityValue>
-                  <ActivityValue label={uploadLabel} className="activity-upload">{rate(row.up)}</ActivityValue>
+                  <ActivityValue label={downloadLabel} className={row.down > 0 ? "activity-download has-rate" : "activity-download"}>{rate(row.down)}</ActivityValue>
+                  <ActivityValue label={uploadLabel} className={row.up > 0 ? "activity-upload has-rate" : "activity-upload"}>{rate(row.up)}</ActivityValue>
                   <ActivityValue label={siteLabel}>
-                    <span className="activity-cell-text" title={[site, ...(row.hosts || [])].filter(Boolean).join(" · ")}>{site || "—"}</span>
+                    <span className={site ? "activity-cell-text activity-site" : "activity-cell-text"}
+                      style={site ? { "--activity-site-color": siteColor(row.site, sites) } : undefined}
+                      title={[site, ...(row.hosts || [])].filter(Boolean).join(" · ")}>
+                      {site && <i aria-hidden="true" />}
+                      {site || "—"}
+                    </span>
                   </ActivityValue>
                   <ActivityValue label={limitLabel} className="activity-limit">{row.managed ? rate(row.limit) : "—"}</ActivityValue>
                   <ActivityValue label={connectionsLabel} className="activity-peers">{row.connections}</ActivityValue>

@@ -51,7 +51,7 @@ function demoData() {
       afterTarget: MB,
     }));
   return {
-    version: "0.1.17",
+    version: "0.1.18",
     catalog: {
       sites: 329,
       domains: 780,
@@ -1993,6 +1993,7 @@ export function App() {
               changePage={setTorrentPage}
               clients={c.clients}
               siteName={siteName}
+              sites={c.sites}
               guard={guard}
               editTorrent={editTorrent}
               t={t}
