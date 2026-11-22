@@ -51,7 +51,7 @@ function demoData() {
       afterTarget: MB,
     }));
   return {
-    version: "0.1.18",
+    version: "0.1.19",
     catalog: {
       sites: 329,
       domains: 780,
@@ -272,6 +272,12 @@ function Plot({
             : { hour: "2-digit", minute: "2-digit" }),
       });
       chart.data.labels = series.times.map((time) => format.format(time * 1000));
+    } else {
+      const first = series.times[0];
+      const last = series.times.at(-1);
+      const padding = first === last ? Math.max(15, pollSeconds) / 2 : 0;
+      chart.options.scales.x.min = first === undefined ? undefined : first - padding;
+      chart.options.scales.x.max = last === undefined ? undefined : last + padding;
     }
     const previous = new Map(chart.data.datasets.map((dataset) => [dataset.siteId, dataset]));
     chart.data.datasets = series.datasets.map((site) =>
@@ -301,7 +307,7 @@ function Plot({
     // Chart.js replays the last pointer event on update, keeping the tooltip
     // open while refreshed data is drawn beneath a stationary cursor.
     chart.update("none");
-  }, [series, bars, dark, hidden, rangeSeconds, timeZone]);
+  }, [series, bars, dark, hidden, rangeSeconds, pollSeconds, timeZone]);
   return (
     <div>
       <div className="chart">
@@ -1994,6 +2000,7 @@ export function App() {
               clients={c.clients}
               siteName={siteName}
               sites={c.sites}
+              allocated={data.activeSummary?.limit}
               guard={guard}
               editTorrent={editTorrent}
               t={t}

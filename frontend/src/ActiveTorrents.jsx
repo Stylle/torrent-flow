@@ -45,11 +45,12 @@ function ActivityValue({ label, className, children }) {
   );
 }
 
-export function ActiveTorrents({ summary, rows, total, page, filter, changeFilter, changePage, clients, sites, siteName, guard, editTorrent, t }) {
+export function ActiveTorrents({ summary, rows, total, page, filter, changeFilter, changePage, clients, sites, siteName, allocated, guard, editTorrent, t }) {
   if (!summary) {
     const demo = demoActivity(rows);
     summary = demo.summary;
     rows = demo.rows;
+    allocated = rows.reduce((sum, row) => sum + (row.managed ? row.limit : 0), 0);
   }
   if (filter !== "all") rows = rows.filter((row) => row[filter]);
   total ??= rows.length;
@@ -70,8 +71,11 @@ export function ActiveTorrents({ summary, rows, total, page, filter, changeFilte
         <div className="activity-rates">
           <span title={downloadLabel}><ArrowDown className="down" size={17} />{formatBytes(summary.down, true)}</span>
           <span title={uploadLabel}><ArrowUp className="up" size={17} />{formatBytes(summary.up, true)}</span>
-          {guard}
+          {allocated != null && <span className="activity-allocated">
+            {t("已分配带宽", "Allocated bandwidth")} <strong>{formatBytes(allocated, true)}</strong>
+          </span>}
         </div>
+        {guard}
       </div>
       <div className="group activity-filters" role="group" aria-label={t("筛选活跃种子", "Filter active torrents")}>
         {filters.map(([value, key, zh, en]) => (
@@ -89,7 +93,6 @@ export function ActiveTorrents({ summary, rows, total, page, filter, changeFilte
             <colgroup>
               <col className="activity-name-col" />
               <col className="activity-progress-col" />
-              <col />
               <col />
               <col />
               <col />
