@@ -314,7 +314,7 @@ func (sv *Server) snapshot(w http.ResponseWriter, r *http.Request) {
 		rows.Close()
 	}
 	events := []Event{}
-	rows, err = sv.s.db.Query("SELECT at,kind,k,message FROM events ORDER BY id DESC LIMIT 100")
+	rows, err = sv.s.db.Query("SELECT at,kind,k,message FROM events WHERE kind NOT GLOB 'diag-*' ORDER BY id DESC LIMIT 100")
 	if err == nil {
 		for rows.Next() {
 			var e Event
@@ -358,6 +358,11 @@ func (sv *Server) snapshot(w http.ResponseWriter, r *http.Request) {
 		outletBudgets[pool.ID] = map[string]any{"budget": budget, "night": night, "timezone": c.Timezone}
 	}
 	payload := map[string]any{"version": Version, "config": redacted(c), "clients": statuses, "warnings": warnings, "buckets": buckets, "speeds": speeds, "leases": leases, "events": events, "guardian": time.Now().Unix()-heartbeat(sv.s, "guardian") < 20, "start": start.Unix(), "end": end.Unix(), "siteRates": siteRates, "siteSpeeds": siteSpeeds, "speedWindow": window, "activeSummary": activeSummary, "outletBudgets": outletBudgets, "catalog": sv.e.catalog.status(), "downloaderStats": downloaderStats}
+	if r.URL.Query().Get("view") == "logs" {
+		entries, err := sv.e.diagnostics(r.Context())
+		payload["diagnostics"] = entries
+		payload["diagnosticsUnavailable"] = err != nil
+	}
 	if r.URL.Query().Get("view") == "active" {
 		payload["lifetime"] = lifetime
 		downloads := []Torrent{}

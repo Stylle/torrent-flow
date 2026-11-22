@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
@@ -17,13 +18,63 @@ import (
 
 var errTorrentGone = errors.New("torrent no longer exists")
 
+type downloaderRequestError struct {
+	message   string
+	retryable bool
+}
+
+func (e *downloaderRequestError) Error() string { return e.message }
+
+func downloaderHTTPError(service string, status int) error {
+	message := fmt.Sprintf("%s returned HTTP %d", service, status)
+	switch status {
+	case 401, 403:
+		message += ": check credentials and Web API access"
+	case 404:
+		message += ": check the downloader API address or reverse proxy path"
+	case 429:
+		message += ": downloader or reverse proxy is rate limiting requests"
+	}
+	return &downloaderRequestError{
+		message:   message,
+		retryable: status == 408 || status == 502 || status == 503 || status == 504,
+	}
+}
+
+func downloaderNetworkError(err error) error {
+	if errors.Is(err, context.Canceled) {
+		return &downloaderRequestError{message: "downloader request cancelled"}
+	}
+	var dns *net.DNSError
+	if errors.As(err, &dns) {
+		return &downloaderRequestError{message: "downloader hostname could not be resolved", retryable: dns.IsTemporary || dns.IsTimeout}
+	}
+	var networkErr net.Error
+	if errors.As(err, &networkErr) && networkErr.Timeout() {
+		return &downloaderRequestError{message: "downloader request timed out", retryable: true}
+	}
+	var operation *net.OpError
+	if errors.As(err, &operation) {
+		if operation.Op == "dial" {
+			return &downloaderRequestError{message: "could not connect to downloader address or port", retryable: true}
+		}
+		return &downloaderRequestError{message: "downloader connection interrupted", retryable: true}
+	}
+	if errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, io.EOF) {
+		return &downloaderRequestError{message: "downloader response ended early", retryable: true}
+	}
+	return &downloaderRequestError{message: "downloader request failed; check the URL and HTTPS certificate"}
+}
+
 type Adapter struct {
-	c            Client
-	http         *http.Client
-	session      string
-	trackerCache map[string]trackerEntry
-	progress     func()
-	endpoint     string
+	c                Client
+	http             *http.Client
+	session          string
+	trackerCache     map[string]trackerEntry
+	progress         func()
+	endpoint         string
+	trackerAttempted bool
+	trackerFailure   string
 }
 type trackerEntry struct {
 	urls []string
@@ -112,7 +163,7 @@ func (a *Adapter) request(ctx context.Context, path string, body []byte, ctype s
 		}
 		r, e := a.http.Do(req)
 		if e != nil {
-			return nil, 0, fmt.Errorf("downloader unreachable or request timed out")
+			return nil, 0, downloaderNetworkError(e)
 		}
 		defer r.Body.Close()
 		if a.c.Kind == "tr" && (r.StatusCode == 301 || r.StatusCode == 302 || r.StatusCode == 307 || r.StatusCode == 308) {
@@ -137,7 +188,10 @@ func (a *Adapter) request(ctx context.Context, path string, body []byte, ctype s
 			a.session = r.Header.Get("X-Transmission-Session-Id")
 		}
 		b, e := io.ReadAll(io.LimitReader(r.Body, 32<<20))
-		return b, r.StatusCode, e
+		if e != nil {
+			return nil, r.StatusCode, downloaderNetworkError(e)
+		}
+		return b, r.StatusCode, nil
 	}
 	return nil, 0, fmt.Errorf("Transmission RPC redirect loop; check RPC endpoint")
 }
@@ -153,8 +207,14 @@ func (a *Adapter) qb(ctx context.Context, path string, form url.Values) ([]byte,
 	if status == 403 {
 		v := url.Values{"username": {a.c.User}, "password": {a.c.Password}}
 		loginBody, code, loginErr := a.request(ctx, "/api/v2/auth/login", []byte(v.Encode()), "application/x-www-form-urlencoded")
-		if loginErr != nil || code != 200 || string(loginBody) != "Ok." {
-			return nil, fmt.Errorf("qBittorrent authentication failed")
+		if loginErr != nil {
+			return nil, fmt.Errorf("qBittorrent login request: %w", loginErr)
+		}
+		if code != 200 {
+			return nil, downloaderHTTPError("qBittorrent login", code)
+		}
+		if strings.TrimSpace(string(loginBody)) != "Ok." {
+			return nil, fmt.Errorf("qBittorrent authentication failed: check username and password")
 		}
 		b, status, e = a.request(ctx, "/api/v2/"+path, body, "application/x-www-form-urlencoded")
 		if e != nil {
@@ -162,7 +222,7 @@ func (a *Adapter) qb(ctx context.Context, path string, form url.Values) ([]byte,
 		}
 	}
 	if status != 200 {
-		return nil, fmt.Errorf("qBittorrent API returned HTTP %d", status)
+		return nil, downloaderHTTPError("qBittorrent API", status)
 	}
 	return b, nil
 }
@@ -188,7 +248,7 @@ func (a *Adapter) rpc(ctx context.Context, method string, args any, out any) err
 			case 404:
 				return fmt.Errorf("Transmission RPC HTTP 404: check RPC path (usually /transmission/rpc)")
 			}
-			return fmt.Errorf("Transmission RPC returned HTTP %d", status)
+			return downloaderHTTPError("Transmission RPC", status)
 		}
 		var result struct {
 			Result    string          `json:"result"`
@@ -201,12 +261,36 @@ func (a *Adapter) rpc(ctx context.Context, method string, args any, out any) err
 			return fmt.Errorf("Transmission request rejected")
 		}
 		if out != nil {
-			return json.Unmarshal(result.Arguments, out)
+			if err := json.Unmarshal(result.Arguments, out); err != nil {
+				return fmt.Errorf("Transmission returned invalid RPC arguments")
+			}
 		}
 		return nil
 	}
 	return fmt.Errorf("Transmission session negotiation failed")
 }
+
+// Retry only read-only sampling and only after a transient failure.
+func (a *Adapter) sample(ctx context.Context) ([]Torrent, error) {
+	a.trackerAttempted = false
+	a.trackerFailure = ""
+	ctx, cancel := context.WithTimeout(ctx, 9*time.Second)
+	defer cancel()
+	items, err := a.list(ctx)
+	var failure *downloaderRequestError
+	if !errors.As(err, &failure) || !failure.retryable {
+		return items, err
+	}
+	timer := time.NewTimer(250 * time.Millisecond)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return nil, err
+	case <-timer.C:
+		return a.list(ctx)
+	}
+}
+
 func (a *Adapter) list(ctx context.Context) ([]Torrent, error) {
 	out := []Torrent{}
 	if a.c.Kind == "qb" {
@@ -228,10 +312,12 @@ func (a *Adapter) list(ctx context.Context) ([]Torrent, error) {
 			Tracker       string   `json:"tracker"`
 			Added         int64    `json:"added_on"`
 		}
-		if e = json.Unmarshal(b, &rows); e != nil {
-			return nil, fmt.Errorf("invalid qBittorrent torrent list")
+		if e = json.Unmarshal(b, &rows); e != nil || rows == nil {
+			return nil, fmt.Errorf("qBittorrent did not return a torrent list; check API path or reverse proxy")
 		}
 		trackerRequests := 0
+		trackerCtx, cancelTrackers := context.WithTimeout(ctx, 2*time.Second)
+		defer cancelTrackers()
 		for _, r := range rows {
 			t := Torrent{Downloading: r.Down > 0 || qbDownloading(r.DownloadState), Progress: r.Progress, Client: a.c.ID, Hash: strings.ToLower(r.Hash), Name: r.Name, Uploaded: r.Uploaded, Downloaded: r.Downloaded, Up: r.Up, Down: r.Down, Limit: r.Limit, Connections: r.Connections, Added: r.Added}
 			if t.Limit < 0 {
@@ -261,7 +347,7 @@ func (a *Adapter) list(ctx context.Context) ([]Torrent, error) {
 				out = append(out, t)
 				continue
 			}
-			if trackerRequests >= 32 {
+			if trackerRequests >= 32 || trackerCtx.Err() != nil {
 				if ok && primaryMatches {
 					t.Trackers = append(t.Trackers, cached.urls...)
 				}
@@ -272,11 +358,22 @@ func (a *Adapter) list(ctx context.Context) ([]Torrent, error) {
 				continue
 			}
 			trackerRequests++
-			tb, e := a.qb(ctx, "torrents/trackers?hash="+url.QueryEscape(t.Hash), nil)
-			if e != nil {
+			a.trackerAttempted = true
+			tb, e := a.qb(trackerCtx, "torrents/trackers?hash="+url.QueryEscape(t.Hash), nil)
+			var trackers []struct {
+				URL string `json:"url"`
+			}
+			if e != nil || json.Unmarshal(tb, &trackers) != nil || trackers == nil {
+				if a.trackerFailure == "" {
+					reason := "invalid Tracker metadata response"
+					if e != nil {
+						reason = e.Error()
+					}
+					a.trackerFailure = "qBittorrent Tracker metadata unavailable; primary or cached metadata used when available: " + reason
+				}
 				if host(r.Tracker) != "" {
 					t.Trackers = []string{r.Tracker}
-				} else if ok {
+				} else if ok && primaryMatches {
 					t.Trackers = cached.urls
 				}
 				out = append(out, t)
@@ -284,12 +381,6 @@ func (a *Adapter) list(ctx context.Context) ([]Torrent, error) {
 			}
 			if host(r.Tracker) != "" {
 				t.Trackers = append(t.Trackers, r.Tracker)
-			}
-			var trackers []struct {
-				URL string `json:"url"`
-			}
-			if json.Unmarshal(tb, &trackers) != nil {
-				return nil, fmt.Errorf("invalid qBittorrent tracker list")
 			}
 			for _, tr := range trackers {
 				if host(tr.URL) != "" {
@@ -325,6 +416,9 @@ func (a *Adapter) list(ctx context.Context) ([]Torrent, error) {
 		fields := []string{"hashString", "name", "uploadedEver", "downloadedEver", "rateUpload", "rateDownload", "uploadLimit", "uploadLimited", "peersGettingFromUs", "addedDate", "trackers", "peers", "status", "percentDone"}
 		if e := a.rpc(ctx, "torrent-get", map[string]any{"fields": fields}, &r); e != nil {
 			return nil, e
+		}
+		if r.Torrents == nil {
+			return nil, fmt.Errorf("Transmission RPC response missing torrent list")
 		}
 		for _, v := range r.Torrents {
 			t := Torrent{Downloading: v.Down > 0 || v.DownloadState == 4, Progress: v.Progress, Client: a.c.ID, Hash: strings.ToLower(v.Hash), Name: v.Name, Uploaded: v.Uploaded, Downloaded: v.Downloaded, Up: v.Up, Down: v.Down, Connections: v.Connections, Added: v.Added}

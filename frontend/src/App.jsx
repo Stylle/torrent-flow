@@ -50,7 +50,7 @@ function demoData() {
       afterTarget: MB,
     }));
   return {
-    version: "0.1.11",
+    version: "0.1.12",
     catalog: {
       sites: 329,
       domains: 780,
@@ -311,6 +311,7 @@ function weekStart(value) {
   return d.toISOString().slice(0, 10);
 }
 export function App() {
+  const [diagnosticFilter, setDiagnosticFilter] = useState("");
   const demo = new URLSearchParams(location.search).get("demo") === "1";
   const [data, setData] = useState(demo ? demoData() : null),
     [auth, setAuth] = useState(demo ? "yes" : "loading"),
@@ -496,7 +497,7 @@ export function App() {
   async function refresh() {
     if (!demo) {
       const v = await api(
-        `snapshot?period=${[1, 10].includes(page) ? period : "day"}&date=${[1, 10].includes(page) ? date : new Date().toLocaleDateString("en-CA")}&window=${speedWindow}&group=${page === 10 ? "downloaders" : "sites"}&view=${page === 0 ? "active" : page === 8 ? "all" : "none"}&downloadOffset=${downloadPage * 50}&offset=${torrentPage * 50}&search=${encodeURIComponent(page === 8 ? search : "")}`,
+        `snapshot?period=${[1, 10].includes(page) ? period : "day"}&date=${[1, 10].includes(page) ? date : new Date().toLocaleDateString("en-CA")}&window=${speedWindow}&group=${page === 10 ? "downloaders" : "sites"}&view=${page === 0 ? "active" : page === 8 ? "all" : page === 11 ? "logs" : "none"}&downloadOffset=${downloadPage * 50}&offset=${torrentPage * 50}&search=${encodeURIComponent(page === 8 ? search : "")}`,
       );
       setData(v);
     }
@@ -510,7 +511,7 @@ export function App() {
       inFlight = true;
       try {
         const v = await api(
-          `snapshot?period=${[1, 10].includes(page) ? period : "day"}&date=${[1, 10].includes(page) ? date : new Date().toLocaleDateString("en-CA")}&window=${speedWindow}&group=${page === 10 ? "downloaders" : "sites"}&view=${page === 0 ? "active" : page === 8 ? "all" : "none"}&downloadOffset=${downloadPage * 50}&offset=${torrentPage * 50}&search=${encodeURIComponent(page === 8 ? search : "")}`,
+          `snapshot?period=${[1, 10].includes(page) ? period : "day"}&date=${[1, 10].includes(page) ? date : new Date().toLocaleDateString("en-CA")}&window=${speedWindow}&group=${page === 10 ? "downloaders" : "sites"}&view=${page === 0 ? "active" : page === 8 ? "all" : page === 11 ? "logs" : "none"}&downloadOffset=${downloadPage * 50}&offset=${torrentPage * 50}&search=${encodeURIComponent(page === 8 ? search : "")}`,
         );
         if (alive) {
           setData(v);
@@ -1035,13 +1036,22 @@ export function App() {
                     "dot " + (!cl.enabled || !s?.online ? "offline" : "")
                   }
                 />
-                {cl.enabled && s?.online
-                  ? t("运行中", "Online")
-                  : cl.enabled
-                    ? t("连接待检查", "Check connection")
-                    : t("未启用", "Disabled")}
+                {!cl.enabled
+                  ? t("未启用", "Disabled")
+                  : s?.statisticsError
+                    ? t("已连接，统计写入失败", "Online · statistics write failed")
+                    : s?.online
+                      ? t("运行中", "Online")
+                      : s?.failures >= 3
+                        ? t("连续采样失败", "Sampling repeatedly failed")
+                        : s?.failures
+                          ? t("采样失败，等待重试", "Sampling failed · retrying")
+                          : t("等待首次采样", "Waiting for first sample")}
               </small>
-              {page === 3 && s?.error && <small>{s.error}</small>}
+              {cl.enabled && s?.error && <small>{s.error}</small>}
+              {cl.enabled && !s?.online && s?.lastSuccess > 0 && (
+                <small>{t("最近成功采样：", "Last successful sample: ")}{new Date(s.lastSuccess * 1000).toLocaleString()}</small>
+              )}
               {cl.clearPending && (
                 <small role="status">
                   {t(
@@ -2316,7 +2326,64 @@ export function App() {
         )}
         {page === 11 && (
           <>
-            {" "}
+            <section className="card">
+              <div className="section-head">
+                <h2>{t("故障诊断", "Diagnostics")}</h2>
+                <select
+                  aria-label={t("筛选诊断类型", "Filter diagnostics")}
+                  value={diagnosticFilter}
+                  onChange={(e) => setDiagnosticFilter(e.target.value)}
+                >
+                  <option value="">{t("全部类型", "All types")}</option>
+                  <option value="diag-sampling">{t("下载器采样", "Downloader sampling")}</option>
+                  <option value="diag-tracker">{t("Tracker 元数据", "Tracker metadata")}</option>
+                  <option value="diag-statistics">{t("流量统计写入", "Traffic statistics writes")}</option>
+                  <option value="diag-speed">{t("速率历史写入", "Speed history writes")}</option>
+                  <option value="diag-storage">{t("控制器存储", "Controller storage")}</option>
+                </select>
+              </div>
+              {data.diagnosticsUnavailable && (
+                <p role="status">{t("历史诊断暂无法读取，可查看容器日志。", "Diagnostic history is temporarily unavailable. Check the container logs.")}</p>
+              )}
+              {(() => {
+                const entries = (data.diagnostics || []).filter(
+                  (entry) => !diagnosticFilter || entry.kind === diagnosticFilter,
+                );
+                const categories = {
+                  "diag-sampling": t("下载器采样", "Downloader sampling"),
+                  "diag-tracker": t("Tracker 元数据", "Tracker metadata"),
+                  "diag-statistics": t("流量统计写入", "Traffic statistics writes"),
+                  "diag-speed": t("速率历史写入", "Speed history writes"),
+                  "diag-storage": t("控制器存储", "Controller storage"),
+                };
+                return entries.length ? (
+                  <div className="table-wrap">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>{t("时间", "Time")}</th>
+                          <th>{t("类型", "Type")}</th>
+                          <th>{t("来源", "Source")}</th>
+                          <th>{t("详情", "Details")}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {entries.map((entry, index) => (
+                          <tr key={index}>
+                            <td>{new Date(entry.time * 1000).toLocaleString()}</td>
+                            <td>{categories[entry.kind] || entry.kind}</td>
+                            <td>{c.clients.find((client) => client.id === entry.key)?.name || entry.key || t("主服务", "Controller")}</td>
+                            <td>{entry.message === "Recovered" ? t("已恢复", "Recovered") : entry.message}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="empty">{t("暂无匹配的诊断记录", "No matching diagnostic events")}</div>
+                );
+              })()}
+            </section>
             <section className="card">
               <h2>{t("恢复清单", "Recovery queue")}</h2>
               {!data.leases.length ? (
@@ -2344,7 +2411,7 @@ export function App() {
             </section>
             <section className="card">
               <div className="section-head">
-                <h2>{t("运行记录", "Activity log")}</h2>
+                <h2>{t("调速操作", "Allocation activity")}</h2>
                 <small>{t("最近 100 条", "Latest 100 events")}</small>
               </div>
               {!data.events.length ? (

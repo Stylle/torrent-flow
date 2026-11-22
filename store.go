@@ -1,14 +1,16 @@
 package main
 
 import (
+	"context"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
 	"database/sql"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
-	_ "modernc.org/sqlite"
+	"modernc.org/sqlite"
 	"os"
 	"path/filepath"
 	"strings"
@@ -105,6 +107,7 @@ CREATE TABLE IF NOT EXISTS site_speeds(at INTEGER,site TEXT,up INTEGER,down INTE
 CREATE TABLE IF NOT EXISTS leases(k TEXT PRIMARY KEY,client TEXT,hash TEXT,original INTEGER,last INTEGER,planned INTEGER,state TEXT,at INTEGER);
 CREATE TABLE IF NOT EXISTS control_blocks(k TEXT PRIMARY KEY,at INTEGER);
 CREATE TABLE IF NOT EXISTS events(id INTEGER PRIMARY KEY,at INTEGER,kind TEXT,k TEXT,message TEXT);
+CREATE INDEX IF NOT EXISTS events_diagnostic ON events(id) WHERE kind GLOB 'diag-*';
 CREATE TABLE IF NOT EXISTS sessions(token TEXT PRIMARY KEY,csrf TEXT,expires INTEGER);
 CREATE TABLE IF NOT EXISTS notification_jobs(id TEXT PRIMARY KEY,kind TEXT,title TEXT,content TEXT,at INTEGER,next INTEGER,attempts INTEGER,state TEXT,status INTEGER,error TEXT);
 `)
@@ -197,12 +200,88 @@ func randomID() string {
 func event(tx *sql.Tx, kind, key, msg string) {
 	tx.Exec("INSERT INTO events(at,kind,k,message) VALUES(?,?,?,?)", time.Now().Unix(), kind, key, msg)
 }
+
+type statisticsError struct {
+	stage string
+	cause error
+}
+
+func (e *statisticsError) sqliteCode() int {
+	var cause *sqlite.Error
+	if errors.As(e.cause, &cause) {
+		return cause.Code()
+	}
+	return 0
+}
+func (e *statisticsError) busy() bool {
+	code := e.sqliteCode() & 255
+	return code == 5 || code == 6 // SQLITE_BUSY or SQLITE_LOCKED, including extended codes.
+}
+func (e *statisticsError) Error() string {
+	code := e.sqliteCode()
+	reason := "database operation failed"
+	switch code & 255 {
+	case 5, 6:
+		reason = "database busy or locked"
+	case 8, 23:
+		reason = "data is read-only or permission denied"
+	case 10:
+		reason = "storage I/O error"
+	case 11, 26:
+		reason = "database file is invalid or corrupt"
+	case 13:
+		reason = "data disk is full"
+	case 14:
+		reason = "database file could not be opened"
+	case 19:
+		reason = "database constraint rejected the write"
+	}
+	if errors.Is(e.cause, context.Canceled) || errors.Is(e.cause, context.DeadlineExceeded) {
+		reason = "database operation interrupted"
+	}
+	if code != 0 {
+		return fmt.Sprintf("%s: %s (SQLite %d)", e.stage, reason, code)
+	}
+	return e.stage + ": " + reason
+}
+
 func (s *Store) ingest(client string, items []Torrent, now time.Time, poll int) error {
-	tx, e := s.db.Begin()
+	return s.ingestOnce(context.Background(), client, items, now, poll)
+}
+func (s *Store) ingestSample(ctx context.Context, client string, items []Torrent, now time.Time, poll int) error {
+	err := s.ingestOnce(ctx, client, items, now, poll)
+	var failure *statisticsError
+	if errors.As(err, &failure) && failure.stage != "commit" && failure.busy() {
+		timer := time.NewTimer(150 * time.Millisecond)
+		defer timer.Stop()
+		select {
+		case <-ctx.Done():
+		case <-timer.C:
+			return s.ingestOnce(ctx, client, items, now, poll)
+		}
+	}
+	return err
+}
+
+func (s *Store) ingestOnce(ctx context.Context, client string, items []Torrent, now time.Time, poll int) (err error) {
+	stage := "begin"
+	defer func() {
+		if err != nil {
+			err = &statisticsError{stage: stage, cause: err}
+		}
+	}()
+	tx, e := s.db.BeginTx(ctx, nil)
 	if e != nil {
 		return e
 	}
 	defer tx.Rollback()
+	// Reserve the writer before reading the baseline. Otherwise a guardian WAL
+	// commit between the read and first write can invalidate the read snapshot.
+	stage = "write lock"
+	if _, e = tx.ExecContext(ctx, "UPDATE baseline SET present=present WHERE 0"); e != nil {
+		return e
+	}
+	stage = "read baseline"
 	rows, e := tx.Query("SELECT k,up,down,at,added,present FROM baseline WHERE k>=? AND k<?", client+":", client+";")
 	if e != nil {
 		return e
@@ -215,11 +294,21 @@ func (s *Store) ingest(client string, items []Torrent, now time.Time, poll int) 
 	for rows.Next() {
 		var k string
 		var v prev
-		rows.Scan(&k, &v.up, &v.down, &v.at, &v.added, &v.present)
+		if e = rows.Scan(&k, &v.up, &v.down, &v.at, &v.added, &v.present); e != nil {
+			rows.Close()
+			return e
+		}
 		old[k] = v
 	}
+	e = rows.Err()
 	rows.Close()
-	tx.Exec("UPDATE baseline SET present=0 WHERE k>=? AND k<?", client+":", client+";")
+	if e != nil {
+		return e
+	}
+	stage = "update baseline"
+	if _, e = tx.Exec("UPDATE baseline SET present=0 WHERE k>=? AND k<?", client+":", client+";"); e != nil {
+		return e
+	}
 	for _, t := range items {
 		if p, ok := old[t.Key]; ok && p.present && (p.added == t.Added || p.added == 0 || t.Added == 0) {
 			if t.Uploaded >= p.up && t.Downloaded >= p.down {
@@ -227,6 +316,7 @@ func (s *Store) ingest(client string, items []Torrent, now time.Time, poll int) 
 				if u > 0 || d > 0 {
 					uncertain := now.Unix()-p.at > int64(poll*3) || time.Unix(p.at, 0).In(now.Location()).Format("2006-01-02") != now.Format("2006-01-02")
 					hour := time.Date(now.Year(), now.Month(), now.Day(), now.Hour(), 0, 0, 0, now.Location())
+					stage = "write traffic"
 					result, updateErr := tx.Exec("UPDATE traffic SET up=up+?,down=down+? WHERE id=(SELECT id FROM traffic WHERE k=? AND site=? AND at>=? AND at<? AND uncertain=? ORDER BY id LIMIT 1)", u, d, t.Key, t.Site, hour.Unix(), hour.Add(time.Hour).Unix(), uncertain)
 					if updateErr != nil {
 						return updateErr
@@ -238,6 +328,7 @@ func (s *Store) ingest(client string, items []Torrent, now time.Time, poll int) 
 					if e != nil {
 						return e
 					}
+					stage = "write lifetime totals"
 					if _, e = tx.Exec("UPDATE lifetime SET up=up+?,down=down+?,uncertain=MAX(uncertain,?) WHERE id=1", u, d, uncertain); e != nil {
 						return e
 					}
@@ -246,6 +337,7 @@ func (s *Store) ingest(client string, items []Torrent, now time.Time, poll int) 
 				event(tx, "counter-reset", t.Key, "Counters reset; new baseline established")
 			}
 		}
+		stage = "save baseline"
 		_, e = tx.Exec("INSERT OR REPLACE INTO baseline(k,up,down,at,added,present) VALUES(?,?,?,?,?,1)", t.Key, t.Uploaded, t.Downloaded, now.Unix(), t.Added)
 		if e != nil {
 			return e
@@ -261,6 +353,7 @@ func (s *Store) ingest(client string, items []Torrent, now time.Time, poll int) 
 		tx.Exec("DELETE FROM events WHERE at<?", now.AddDate(-1, 0, 0).Unix())
 		tx.Exec("INSERT OR REPLACE INTO settings VALUES('maintenance',?)", now.Unix())
 	}
+	stage = "commit"
 	return tx.Commit()
 }
 func (s *Store) report(start, end time.Time) ([]Bucket, error) {

@@ -1,3 +1,8 @@
+# 0.1.12
+
+- Add a filterable diagnostics log for downloader sampling, Tracker metadata, and SQLite writes, with recovery events and container-log fallback.
+- Keep Tracker metadata and statistics write failures separate from downloader health. Retry transient sampling and SQLite contention before escalating.
+
 # 0.1.11
 
 - Fix maximum upload allowance to apply per active torrent, with weighted redistribution of unused capacity.

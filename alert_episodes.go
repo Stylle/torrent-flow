@@ -21,9 +21,17 @@ func alertIdentity(message string) string {
 	return fmt.Sprintf("%x", hash[:12])
 }
 
+type alertIncident struct {
+	Key     string
+	Message string
+}
+
 // One persisted job per continuous incident. Resolution expires queued retries;
 // recurrence gets a fresh identity, while restart cannot resend an acknowledged job.
-func (s *Store) syncAlertEpisodes(messages []string, now time.Time) error {
+func (s *Store) syncAlertEpisodes(messages []string, now time.Time, incidents ...alertIncident) error {
+	for _, message := range messages {
+		incidents = append(incidents, alertIncident{Key: alertIdentity(message), Message: message})
+	}
 	tx, err := s.db.Begin()
 	if err != nil {
 		return err
@@ -42,15 +50,15 @@ func (s *Store) syncAlertEpisodes(messages []string, now time.Time) error {
 		}
 	}
 	active := map[string]string{}
-	for _, message := range messages {
-		key := alertIdentity(message)
+	for _, incident := range incidents {
+		key := incident.Key
 		if _, ok := active[key]; ok {
 			continue
 		}
 		id := previous[key]
 		if id == "" {
 			id = "alert:" + key + ":" + randomID()
-			if _, err = tx.Exec("INSERT INTO notification_jobs VALUES(?,?,?,?,?,?,0,'pending',0,'')", id, "alert", "流量台 · 告警", message, now.Unix(), now.Unix()); err != nil {
+			if _, err = tx.Exec("INSERT INTO notification_jobs VALUES(?,?,?,?,?,?,0,'pending',0,'')", id, "alert", "流量台 · 告警", incident.Message, now.Unix(), now.Unix()); err != nil {
 				return err
 			}
 		}

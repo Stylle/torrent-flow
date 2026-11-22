@@ -8,23 +8,28 @@ import (
 	"time"
 )
 
+const downloaderAlertFailures = 3
+
 type Engine struct {
-	catalog   *SiteCatalog
-	s         *Store
-	mu        sync.Mutex
-	stateMu   sync.RWMutex
-	torrents  []Torrent
-	statuses  []ClientStatus
-	idle      map[string]time.Time
-	suspended map[string]bool
-	adapters  map[string]*Adapter
-	started   bool
-	lastSpeed int64
-	warnings  []string
+	catalog              *SiteCatalog
+	s                    *Store
+	mu                   sync.Mutex
+	stateMu              sync.RWMutex
+	torrents             []Torrent
+	statuses             []ClientStatus
+	idle                 map[string]time.Time
+	suspended            map[string]bool
+	adapters             map[string]*Adapter
+	started              bool
+	lastSpeed            int64
+	warnings             []string
+	diagnosticMu         sync.Mutex
+	pendingDiagnostics   []Event
+	diagnosticConditions map[[2]string]string
 }
 
 func newEngine(s *Store) *Engine {
-	return &Engine{s: s, catalog: newSiteCatalog(s), idle: map[string]time.Time{}, suspended: map[string]bool{}, adapters: map[string]*Adapter{}, torrents: []Torrent{}, statuses: []ClientStatus{}}
+	return &Engine{s: s, catalog: newSiteCatalog(s), idle: map[string]time.Time{}, suspended: map[string]bool{}, adapters: map[string]*Adapter{}, torrents: []Torrent{}, statuses: []ClientStatus{}, diagnosticConditions: map[[2]string]string{}}
 }
 func (e *Engine) get(c Client) *Adapter {
 	c = normalizeClient(c)
@@ -43,10 +48,13 @@ func heartbeat(s *Store, key string) int64 {
 func (e *Engine) tick(ctx context.Context) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
+	defer e.flushDiagnostics(ctx)
 	c, err := e.s.config()
 	if err != nil {
+		e.diagnosticCondition("storage", "", (&statisticsError{stage: "read controller configuration", cause: err}).Error())
 		return
 	}
+	e.diagnosticCondition("storage", "", "")
 	changed := false
 	for i, cl := range c.Clients {
 		if cl.RestorePending && e.restoreClient(ctx, c, cl.ID) == nil {
@@ -93,7 +101,15 @@ func (e *Engine) tick(ctx context.Context) {
 		}
 		blocked.Close()
 	}
+	lastHeartbeat := now
 	e.s.db.Exec("INSERT OR REPLACE INTO settings VALUES('controller',?)", now.Unix())
+	refreshHeartbeat := func() {
+		current := time.Now()
+		if current.Sub(lastHeartbeat) >= 3*time.Second {
+			e.s.db.Exec("INSERT OR REPLACE INTO settings VALUES('controller',?)", current.Unix())
+			lastHeartbeat = current
+		}
+	}
 	all := []Torrent{}
 	statuses := []ClientStatus{}
 	warnings := []string{}
@@ -104,21 +120,45 @@ func (e *Engine) tick(ctx context.Context) {
 		e.warnings = warnings
 		e.stateMu.Unlock()
 	}()
+	e.stateMu.RLock()
+	previous := make(map[string]ClientStatus, len(e.statuses))
+	for _, status := range e.statuses {
+		previous[status.ID] = status
+	}
+	e.stateMu.RUnlock()
 	var up, down int64
 	for _, cl := range c.Clients {
 		if !cl.Enabled {
 			continue
 		}
 		status := ClientStatus{ID: cl.ID, Name: cl.Name, Kind: cl.Kind, AsOf: now.Unix()}
+		oldAdapter := e.adapters[cl.ID]
 		a := e.get(cl)
-		a.progress = func() { e.s.db.Exec("INSERT OR REPLACE INTO settings VALUES('controller',?)", time.Now().Unix()) }
-		items, err := a.list(ctx)
+		var prior ClientStatus
+		if a == oldAdapter {
+			prior = previous[cl.ID]
+		}
+		status.LastSuccess = prior.LastSuccess
+		refreshHeartbeat()
+		a.progress = refreshHeartbeat
+		items, err := a.sample(ctx)
 		if err != nil {
 			status.Error = err.Error()
+			status.Failures = prior.Failures + 1
+			if ctx.Err() == nil && (status.Failures == 1 || status.Failures == downloaderAlertFailures || status.Error != prior.Error) {
+				e.diagnostic("sampling", cl.ID, samplingFailureMessage(status.Failures, err))
+			}
 			statuses = append(statuses, status)
 			continue
 		}
 		status.Online = true
+		status.LastSuccess = time.Now().Unix()
+		if prior.Failures > 0 {
+			e.diagnostic("sampling", cl.ID, "Recovered")
+		}
+		if a.trackerAttempted {
+			e.diagnosticCondition("tracker", cl.ID, a.trackerFailure)
+		}
 		if next, added := discoverSitesWithCatalog(c, items, e.catalog.index()); added > 0 {
 			next.Revision++
 			if next.validate() == nil && e.s.saveConfig(next) == nil {
@@ -157,9 +197,14 @@ func (e *Engine) tick(ctx context.Context) {
 			status.Up += items[i].Up
 			status.Down += items[i].Down
 		}
-		if err = e.s.ingest(cl.ID, items, now, c.PollSeconds); err != nil {
-			status.Error = "Statistics could not be committed"
-			status.Online = false
+		if err = e.s.ingestSample(ctx, cl.ID, items, now, c.PollSeconds); err != nil {
+			status.Error = err.Error()
+			status.StatisticsError = true
+			if ctx.Err() == nil {
+				e.diagnosticCondition("statistics", cl.ID, status.Error)
+			}
+		} else {
+			e.diagnosticCondition("statistics", cl.ID, "")
 		}
 		all = append(all, items...)
 		statuses = append(statuses, status)
@@ -193,6 +238,11 @@ func (e *Engine) tick(ctx context.Context) {
 			if err == nil {
 				e.lastSpeed = now.Unix()
 			}
+		}
+		if err != nil {
+			e.diagnosticCondition("speed", "", (&statisticsError{stage: "write speed history", cause: err}).Error())
+		} else {
+			e.diagnosticCondition("speed", "", "")
 		}
 	}
 	guard := heartbeat(e.s, "guardian")

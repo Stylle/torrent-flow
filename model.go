@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-const Version = "0.1.11"
+const Version = "0.1.12"
 
 type Client struct {
 	RestorePending  bool   `json:"restorePending"`
@@ -96,14 +96,17 @@ type Torrent struct {
 	Added       int64    `json:"-"`
 }
 type ClientStatus struct {
-	ID     string `json:"id"`
-	Name   string `json:"name"`
-	Kind   string `json:"kind"`
-	Online bool   `json:"online"`
-	Up     int64  `json:"up"`
-	Down   int64  `json:"down"`
-	Error  string `json:"error,omitempty"`
-	AsOf   int64  `json:"asOf"`
+	ID              string `json:"id"`
+	Name            string `json:"name"`
+	Kind            string `json:"kind"`
+	Online          bool   `json:"online"`
+	Up              int64  `json:"up"`
+	Down            int64  `json:"down"`
+	Error           string `json:"error,omitempty"`
+	AsOf            int64  `json:"asOf"`
+	LastSuccess     int64  `json:"lastSuccess,omitempty"`
+	Failures        int    `json:"failures,omitempty"`
+	StatisticsError bool   `json:"statisticsError,omitempty"`
 }
 type Bucket struct {
 	Time      int64  `json:"time"`

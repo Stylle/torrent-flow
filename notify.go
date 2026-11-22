@@ -292,12 +292,22 @@ func (sv *Server) notificationTick(ctx context.Context, now time.Time) {
 		}
 	}
 	var alertMessages []string
+	var downloaderIncidents []alertIncident
 	if n.Alerts {
 		sv.e.stateMu.RLock()
 		messages := append([]string{}, sv.e.warnings...)
 		for _, cl := range sv.e.statuses {
-			if !cl.Online {
-				messages = append(messages, "下载器连接异常："+cl.Name)
+			if cl.Failures >= downloaderAlertFailures {
+				downloaderIncidents = append(downloaderIncidents, alertIncident{
+					Key:     "downloader-sampling:" + cl.ID,
+					Message: "下载器连续采样失败：" + cl.Name + "\n" + cl.Error,
+				})
+			}
+			if cl.StatisticsError {
+				downloaderIncidents = append(downloaderIncidents, alertIncident{
+					Key:     "downloader-statistics:" + cl.ID,
+					Message: "下载器已连接，流量统计写入失败：" + cl.Name + "\n" + cl.Error,
+				})
 			}
 		}
 		failures := map[string]int{}
@@ -331,7 +341,7 @@ func (sv *Server) notificationTick(ctx context.Context, now time.Time) {
 		}
 		alertMessages = messages
 	}
-	if sv.s.syncAlertEpisodes(alertMessages, now) != nil {
+	if sv.s.syncAlertEpisodes(alertMessages, now, downloaderIncidents...) != nil {
 		return // Do not send stale alert retries when current state could not be reconciled.
 	}
 	rows, err := sv.s.db.Query("SELECT id,kind,title,content,at,attempts FROM notification_jobs WHERE state='pending' AND next<=? ORDER BY at LIMIT 4", now.Unix())
