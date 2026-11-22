@@ -51,7 +51,7 @@ function demoData() {
       afterTarget: MB,
     }));
   return {
-    version: "0.1.19",
+    version: "0.1.20",
     catalog: {
       sites: 329,
       domains: 780,
@@ -2001,6 +2001,18 @@ export function App() {
               siteName={siteName}
               sites={c.sites}
               allocated={data.activeSummary?.limit}
+              columnRatios={c.activityColumnRatios}
+              saveColumnRatios={async (ratios) => {
+                try {
+                  if (!demo) await api("activity-columns", { ratios });
+                  setData((current) => ({
+                    ...current,
+                    config: { ...current.config, activityColumnRatios: ratios },
+                  }));
+                } catch (e) {
+                  setError(e.message);
+                }
+              }}
               guard={guard}
               editTorrent={editTorrent}
               t={t}

@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-const Version = "0.1.19"
+const Version = "0.1.20"
 
 type Client struct {
 	RestorePending  bool   `json:"restorePending"`
@@ -66,7 +66,8 @@ type Config struct {
 	PollSeconds   int                 `json:"pollSeconds"`
 	IdleSeconds   int                 `json:"idleSeconds"`
 
-	UploadConfirmSeconds int `json:"uploadConfirmSeconds"`
+	UploadConfirmSeconds int   `json:"uploadConfirmSeconds"`
+	ActivityColumnRatios []int `json:"activityColumnRatios,omitempty"`
 }
 
 func clientPolicyOn(cl Client) bool { return cl.StrategyEnabled == nil || *cl.StrategyEnabled }

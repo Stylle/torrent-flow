@@ -117,3 +117,27 @@ func TestUnifiedActivitySnapshot(t *testing.T) {
 		t.Fatalf("last page returned %d rows", len(tail.Rows))
 	}
 }
+
+func TestActivityColumnRatios(t *testing.T) {
+	s := testStore(t)
+	sv := &Server{s: s, e: newEngine(s)}
+	const payload = `{"ratios":[6500,950,550,350,350,450,350,150,350]}`
+	for _, tc := range []struct {
+		body string
+		code int
+	}{
+		{`{"ratios":[10000]}`, http.StatusBadRequest},
+		{`{"ratios":[6500,950,550,350,350,450,350,150,351]}`, http.StatusBadRequest},
+		{payload, http.StatusOK},
+	} {
+		w := httptest.NewRecorder()
+		sv.saveActivityColumns(w, httptest.NewRequest(http.MethodPost, "/api/activity-columns", strings.NewReader(tc.body)))
+		if w.Code != tc.code {
+			t.Fatalf("save status = %d, want %d", w.Code, tc.code)
+		}
+	}
+	c, err := s.config()
+	if err != nil || len(c.ActivityColumnRatios) != 9 || c.ActivityColumnRatios[0] != 6500 {
+		t.Fatalf("saved ratios were not loaded: %v, %v", c.ActivityColumnRatios, err)
+	}
+}

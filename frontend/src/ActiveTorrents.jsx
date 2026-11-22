@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useLayoutEffect, useRef, useState } from "react";
 import { ArrowDown, ArrowUp } from "./icons.jsx";
 import { formatBytes } from "./units.js";
 import { siteColor } from "./site-chart.js";
@@ -8,6 +8,18 @@ const filters = [
   ["downloading", "downloading", "下载中", "Downloading"],
   ["uploading", "uploading", "上传中", "Uploading"],
 ];
+
+const minimumWidths = [180, 128, 105, 96, 96, 85, 100, 87, 105];
+const minimumTotal = minimumWidths.reduce((sum, width) => sum + width, 0);
+const defaultRatios = [6500, 950, 550, 350, 350, 450, 350, 150, 350];
+
+function resizePair(ratios, index, delta) {
+  const next = [...ratios];
+  const combined = next[index] + next[index + 1];
+  next[index] = Math.max(0, Math.min(combined, next[index] + delta));
+  next[index + 1] = combined - next[index];
+  return next;
+}
 
 function demoActivity(torrents) {
   const rows = torrents
@@ -45,7 +57,26 @@ function ActivityValue({ label, className, children }) {
   );
 }
 
-export function ActiveTorrents({ summary, rows, total, page, filter, changeFilter, changePage, clients, sites, siteName, allocated, guard, editTorrent, t }) {
+export function ActiveTorrents({ summary, rows, total, page, filter, changeFilter, changePage, clients, sites, siteName, allocated, guard, editTorrent, columnRatios, saveColumnRatios, t }) {
+  const table = useRef(null);
+  const list = useRef(null);
+  const drag = useRef(null);
+  const [tableWidth, setTableWidth] = useState(0);
+  const [preview, setPreview] = useState(null);
+  const [boundary, setBoundary] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const ratios = preview ?? (columnRatios?.length === minimumWidths.length ? columnRatios : defaultRatios);
+  const widthFor = (minimum, ratio) => minimum + Math.max(0, tableWidth - minimumTotal) * ratio / 10000;
+  async function persist(next) {
+    setSaving(true);
+    setPreview(next);
+    try {
+      await saveColumnRatios(next);
+    } finally {
+      setPreview(null);
+      setSaving(false);
+    }
+  }
   if (!summary) {
     const demo = demoActivity(rows);
     summary = demo.summary;
@@ -53,6 +84,16 @@ export function ActiveTorrents({ summary, rows, total, page, filter, changeFilte
     allocated = rows.reduce((sum, row) => sum + (row.managed ? row.limit : 0), 0);
   }
   if (filter !== "all") rows = rows.filter((row) => row[filter]);
+  const hasRows = rows.length > 0;
+  useLayoutEffect(() => {
+    if (!hasRows) return;
+    const element = list.current;
+    const measure = () => setTableWidth(element.clientWidth);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [hasRows, filter, page]);
   total ??= rows.length;
   const last = Math.max(0, Math.ceil(total / 50) - 1);
   const downloadLabel = t("下载速度", "Download rate");
@@ -75,35 +116,74 @@ export function ActiveTorrents({ summary, rows, total, page, filter, changeFilte
             {t("已分配带宽", "Allocated bandwidth")} <strong>{formatBytes(allocated, true)}</strong>
           </span>}
         </div>
-        {guard}
-      </div>
-      <div className="group activity-filters" role="group" aria-label={t("筛选活跃种子", "Filter active torrents")}>
+        <div className="group activity-filters" role="group" aria-label={t("筛选活跃种子", "Filter active torrents")}>
         {filters.map(([value, key, zh, en]) => (
           <button key={value} type="button" aria-pressed={filter === value}
             className={filter === value ? "active" : ""} onClick={() => changeFilter(value)}>
             {t(zh, en)} <span>{summary[key]}</span>
           </button>
         ))}
+        </div>
       </div>
       {rows.length === 0 ? (
         <div className="empty">{t("暂无符合条件的活跃种子", "No matching active torrents")}</div>
       ) : (
-        <div className="table-wrap activity-list" key={filter + ":" + page}>
-          <table className="activity-table" role="table">
+        <div className="table-wrap activity-list" key={filter + ":" + page} ref={list}>
+          {boundary !== null && <div className="activity-resize-guide" aria-hidden="true"
+            style={{ left: widthFor(minimumWidths.slice(0, boundary + 1).reduce((sum, width) => sum + width, 0),
+              ratios.slice(0, boundary + 1).reduce((sum, ratio) => sum + ratio, 0)) }} />}
+          <table className="activity-table" role="table" ref={table}>
             <colgroup>
-              <col className="activity-name-col" />
-              <col className="activity-progress-col" />
-              <col />
-              <col />
-              <col />
-              <col />
-              <col />
-              <col className="activity-peers-col" />
-              <col className="activity-status-col" />
+              {minimumWidths.map((width, index) => <col key={index} style={{ width: widthFor(width, ratios[index]) }} />)}
             </colgroup>
             <thead role="rowgroup"><tr role="row">
-              {[t("种子名称", "Torrent name"), progressLabel, downloaderLabel, downloadLabel, uploadLabel, siteLabel, limitLabel, connectionsLabel, t("状态", "Status")].map((label) =>
-                <th key={label} scope="col">{label}</th>
+              {[t("种子名称", "Torrent name"), progressLabel, downloaderLabel, downloadLabel, uploadLabel, siteLabel, limitLabel, connectionsLabel, t("状态", "Status")].map((label, index) =>
+                <th key={label} scope="col">
+                  {label}
+                  {index < minimumWidths.length - 1 && (
+                    <span className={boundary === index ? "activity-resize dragging" : "activity-resize"}
+                      role="separator" tabIndex={0} aria-orientation="vertical"
+                      aria-label={t("调整列宽：", "Resize column: ") + label}
+                      aria-valuemin={0} aria-valuemax={ratios[index] + ratios[index + 1]}
+                      aria-valuenow={ratios[index]}
+                      onPointerDown={(event) => {
+                        if (saving || drag.current || event.button !== 0) return;
+                        const extra = table.current.clientWidth - minimumTotal;
+                        if (extra <= 0) return;
+                        event.preventDefault();
+                        event.currentTarget.setPointerCapture(event.pointerId);
+                        drag.current = { x: event.clientX, ratios, extra, next: ratios };
+                        setBoundary(index);
+                      }}
+                      onPointerMove={(event) => {
+                        const current = drag.current;
+                        if (!current || !event.currentTarget.hasPointerCapture(event.pointerId)) return;
+                        current.next = resizePair(current.ratios, index, Math.round((event.clientX - current.x) * 10000 / current.extra));
+                        setPreview(current.next);
+                      }}
+                      onPointerUp={(event) => {
+                        if (!drag.current || !event.currentTarget.hasPointerCapture(event.pointerId)) return;
+                        const { next, ratios: start } = drag.current;
+                        drag.current = null;
+                        setBoundary(null);
+                        if (next[index] !== start[index]) void persist(next);
+                        else setPreview(null);
+                      }}
+                      onLostPointerCapture={() => {
+                        if (!drag.current) return;
+                        drag.current = null;
+                        setBoundary(null);
+                        setPreview(null);
+                      }}
+                      onKeyDown={(event) => {
+                        if (saving || !["ArrowLeft", "ArrowRight"].includes(event.key)) return;
+                        event.preventDefault();
+                        const next = resizePair(ratios, index, event.key === "ArrowLeft" ? -200 : 200);
+                        if (next[index] !== ratios[index]) void persist(next);
+                      }}
+                    />
+                  )}
+                </th>
               )}
             </tr></thead>
             <tbody role="rowgroup">{rows.map((row) => {
@@ -119,8 +199,8 @@ export function ActiveTorrents({ summary, rows, total, page, filter, changeFilte
                   <ActivityValue label={progressLabel} className="activity-progress">
                     {progress === null ? "—" : (
                       <div className="download-progress">
-                        <progress max="1" value={progress} aria-label={progressLabel} />
                         <span>{(progress * 100).toLocaleString(undefined, { maximumFractionDigits: 1 })}%</span>
+                        <progress max="1" value={progress} aria-label={progressLabel} />
                       </div>
                     )}
                   </ActivityValue>
@@ -152,14 +232,15 @@ export function ActiveTorrents({ summary, rows, total, page, filter, changeFilte
           </table>
         </div>
       )}
-      {total > 0 && (
+      {(total > 0 || guard) && (
         <div className="activity-footer">
-          <small>{t(`共 ${total} 个种子`, `${total} torrents`)}</small>
+          {total > 0 && <small>{t(`共 ${total} 个种子`, `${total} torrents`)}</small>}
           {last > 0 && <div className="pagination">
             <button type="button" disabled={page === 0} onClick={() => changePage(page - 1)}>{t("上一页", "Previous")}</button>
             <small>{page + 1} / {last + 1}</small>
             <button type="button" disabled={page >= last} onClick={() => changePage(page + 1)}>{t("下一页", "Next")}</button>
           </div>}
+          {guard}
         </div>
       )}
     </section>

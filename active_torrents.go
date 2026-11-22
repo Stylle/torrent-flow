@@ -1,6 +1,47 @@
 package main
 
-import "sort"
+import (
+	"net/http"
+	"sort"
+)
+
+func (sv *Server) saveActivityColumns(w http.ResponseWriter, r *http.Request) {
+	var p struct {
+		Ratios []int `json:"ratios"`
+	}
+	if decode(w, r, &p) != nil || len(p.Ratios) != 9 {
+		failHTTP(w, 400, "invalid activity column ratios")
+		return
+	}
+	sum := 0
+	for _, ratio := range p.Ratios {
+		if ratio < 0 || ratio > 10000 {
+			failHTTP(w, 400, "invalid activity column ratios")
+			return
+		}
+		sum += ratio
+	}
+	if sum != 10000 {
+		failHTTP(w, 400, "invalid activity column ratios")
+		return
+	}
+	sv.e.mu.Lock()
+	defer sv.e.mu.Unlock()
+	if !sv.stillAuthorized(r) {
+		failHTTP(w, 401, "sign in required")
+		return
+	}
+	c, err := sv.s.config()
+	if err == nil {
+		c.ActivityColumnRatios = p.Ratios
+		err = sv.s.saveConfig(c)
+	}
+	if err != nil {
+		failHTTP(w, 500, "could not save activity column ratios")
+		return
+	}
+	jsonOut(w, p)
+}
 
 type activeTorrent struct {
 	Torrent

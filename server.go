@@ -147,6 +147,7 @@ func (sv *Server) handler() http.Handler {
 	})
 	api.HandleFunc("GET /api/snapshot", sv.snapshot)
 	api.HandleFunc("POST /api/config", sv.save)
+	api.HandleFunc("POST /api/activity-columns", sv.saveActivityColumns)
 	api.HandleFunc("GET /api/site-catalog", sv.catalogSettings)
 	api.HandleFunc("POST /api/site-catalog", sv.catalogSettings)
 	api.HandleFunc("POST /api/client-enabled", sv.clientEnabled)
@@ -480,6 +481,7 @@ func (sv *Server) save(w http.ResponseWriter, r *http.Request) {
 	c.PolicyEnabled = old.PolicyEnabled
 	c.ClearPending = old.ClearPending
 	c.PolicyVersion = old.PolicyVersion
+	c.ActivityColumnRatios = old.ActivityColumnRatios
 	for _, previous := range old.Clients {
 		found := false
 		for i := range c.Clients {
