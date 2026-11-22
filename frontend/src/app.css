@@ -1444,29 +1444,38 @@ input[type="checkbox"] {
 .activity-header h2 { margin: 0; }
 .activity-rates { flex-wrap: wrap; }
 .activity-rates > span { gap: 5px; white-space: nowrap; }
+.activity-rates > .badge {
+  margin-inline-start: 6px;
+  padding-inline-start: 14px;
+  border-inline-start: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+}
 .activity-filters {
   display: inline-flex;
   max-width: 100%;
   margin: 12px 0 8px;
 }
-.activity-filters button { white-space: nowrap; }
+.activity-filters button { min-width: 86px; white-space: nowrap; }
 .activity-filters button.active {
   background: var(--soft);
   color: var(--ink);
 }
 .activity-filters button span { margin-inline-start: 3px; }
 .activity-list { max-height: 460px; }
+.activity-table { table-layout: fixed; font-size: 14px; }
+.activity-name-col { width: 23%; }
+.activity-progress-col { width: 19%; }
+.activity-peers-col { width: 10%; }
+.activity-status-col { width: 16%; }
 .activity-table th {
   background: var(--surface);
   position: sticky;
   top: 0;
   z-index: 1;
 }
-.active-torrents .activity-table td { white-space: nowrap; padding-block: 8px; }
-.activity-table .activity-name {
-  width: 27%;
-  max-width: 290px;
-}
+.active-torrents .activity-table td { white-space: nowrap; padding-block: 7px; }
+.active-torrents .activity-table .activity-status { white-space: normal; }
 .activity-name button,
 .activity-name small {
   display: block;
@@ -1522,10 +1531,14 @@ input[type="checkbox"] {
 .activity-status .warning { color: var(--ink); }
 .activity-footer { color: var(--muted); margin-top: 10px; }
 .activity-footer .pagination { margin: 0; }
+@media (min-width: 1001px) {
+  .main .overview-speed .chart { height: 148px; }
+}
 @media (max-width: 760px) {
   .activity-rates { column-gap: 10px; row-gap: 6px; }
   .activity-list { max-height: none; }
   .activity-table { display: block; }
+  .activity-table colgroup { display: none; }
   .activity-table thead {
     position: absolute;
     width: 1px;
@@ -1553,4 +1566,8 @@ input[type="checkbox"] {
   .activity-progress { grid-column: span 2; }
   .activity-peers { grid-column: 3; grid-row: 2; }
   .activity-field-label { display: block; color: var(--muted); font-size: 11px; }
+}
+@media (max-width: 420px) {
+  .activity-filters button { min-width: 0; }
+  .activity-rates > .badge { margin-inline-start: 0; padding-inline-start: 8px; }
 }

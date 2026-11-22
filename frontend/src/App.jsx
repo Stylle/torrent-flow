@@ -1926,7 +1926,7 @@ export function App() {
         )}
         {page === 0 && (
           <>
-            <section className="card">
+            <section className="card overview-speed">
               <div className="section-head">
                 <h2>{t("实时速率", "Live transfer rate")}</h2>
                 <div className="plot-controls">

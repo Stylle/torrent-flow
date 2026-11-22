@@ -83,6 +83,15 @@ export function ActiveTorrents({ summary, rows, total, page, filter, changeFilte
       ) : (
         <div className="table-wrap activity-list" key={filter + ":" + page}>
           <table className="activity-table" role="table">
+            <colgroup>
+              <col className="activity-name-col" />
+              <col className="activity-progress-col" />
+              <col />
+              <col />
+              <col />
+              <col className="activity-peers-col" />
+              <col className="activity-status-col" />
+            </colgroup>
             <thead role="rowgroup"><tr role="row">
               {[t("种子名称", "Torrent name"), progressLabel, downloadLabel, uploadLabel, limitLabel, connectionsLabel, t("状态", "Status")].map((label) =>
                 <th key={label} scope="col">{label}</th>
@@ -106,12 +115,12 @@ export function ActiveTorrents({ summary, rows, total, page, filter, changeFilte
                       </div>
                     )}
                   </ActivityValue>
-                  <ActivityValue label={downloadLabel} className="activity-download"><span className="down">{rate(row.down)}</span></ActivityValue>
-                  <ActivityValue label={uploadLabel} className="activity-upload"><span className="up">{rate(row.up)}</span></ActivityValue>
+                  <ActivityValue label={downloadLabel} className="activity-download">{rate(row.down)}</ActivityValue>
+                  <ActivityValue label={uploadLabel} className="activity-upload">{rate(row.up)}</ActivityValue>
                   <ActivityValue label={limitLabel} className="activity-limit">{row.managed ? rate(row.limit) : "—"}</ActivityValue>
                   <ActivityValue label={connectionsLabel} className="activity-peers">{row.connections}</ActivityValue>
                   <td className={`activity-status ${status?.[0] || (row.down > 0 ? "downloading" : "neutral")}`} title={row.state}>
-                    {row.downloading && <span className={row.down > 0 ? "down" : "muted"}>
+                    {row.downloading && <span className={row.down > 0 ? undefined : "muted"}>
                       {row.down > 0 ? t("下载中", "Downloading") : t("等待数据", "Waiting for data")}
                     </span>}
                     {row.downloading && status && <span aria-hidden="true"> · </span>}
