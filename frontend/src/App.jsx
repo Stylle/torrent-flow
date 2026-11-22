@@ -50,7 +50,7 @@ function demoData() {
       afterTarget: MB,
     }));
   return {
-    version: "0.1.12",
+    version: "0.1.13",
     catalog: {
       sites: 329,
       domains: 780,
@@ -69,6 +69,7 @@ function demoData() {
       timezone: "Asia/Shanghai",
       pollSeconds: 5,
       idleSeconds: 15,
+      uploadConfirmSeconds: 0,
       sites,
       pools: [{ id: "home", name: "家庭网络", budget: 30 * MB, enabled: true }],
       clients: [
@@ -767,6 +768,7 @@ export function App() {
       next.timezone = form.timezone;
       next.pollSeconds = Number(form.pollSeconds);
       next.idleSeconds = Number(form.idleSeconds);
+      next.uploadConfirmSeconds = Number(form.uploadConfirmSeconds);
     } else {
       const field = { client: "clients", site: "sites", pool: "pools" }[modal],
         v = { ...form };
@@ -1210,7 +1212,7 @@ export function App() {
         (x.hosts || []).some((h) =>
           h.toLowerCase().includes(search.toLowerCase()),
         )) &&
-      (page !== 0 || x.connections > 0 || x.up > 0),
+      (serverPaged || page !== 0 || x.connections > 0 || x.up > 0),
   );
   const downloading =
     data?.downloading ||
@@ -1393,10 +1395,10 @@ export function App() {
           <div className="empty">
             {t(
               page === 0
-                ? "暂无正在接管且有上传连接的种子"
+                ? "暂无符合分配条件的种子"
                 : "没有匹配的种子，连接下载器后自动采集",
               page === 0
-                ? "No controlled torrents with active upload connections"
+                ? "No torrents qualify for allocation"
                 : "No matching torrents. Connect a downloader to begin.",
             )}
           </div>
@@ -2085,10 +2087,15 @@ export function App() {
               {torrents}
               <p className="hint">
                 <Info size={15} />
-                {t(
-                  "显示有上传连接或正在上传的种子，包括待分配和操作失败项；自动策略由各下载器独立控制。",
-                  "Shows torrents with upload connections or actual uploads, including pending and failed operations. Each downloader controls its own strategy.",
-                )}
+                {c.uploadConfirmSeconds > 0
+                  ? t(
+                      `累计上传字节在连续采样间隔内增长，确认至少 ${c.uploadConfirmSeconds} 秒后参与分配。`,
+                      `Torrents qualify after at least ${c.uploadConfirmSeconds} seconds of growth across consecutive upload samples.`,
+                    )
+                  : t(
+                      "显示有上传连接或正在上传的种子，包括待分配和操作失败项；自动策略由各下载器独立控制。",
+                      "Shows torrents with upload connections or actual uploads, including pending and failed operations. Each downloader controls its own strategy.",
+                    )}
               </p>
             </section>
           </>
@@ -2636,7 +2643,7 @@ export function App() {
             <h3>{t("停止与恢复", "Stop and recovery")}</h3>
             <p>
               {t(
-                "停止策略会清空该下载器所有种子级上传限速，包括手工限速；不改全局限速。无连接且无流量持续15秒后释放系统限速。主服务掉线由独立守护恢复；守护、下载器或整机也离线时需等待恢复连接。",
+                "停止策略会清空该下载器所有种子级上传限速，包括手工限速；不改全局限速。种子闲置后按采集设置释放系统限速。主服务掉线由独立守护恢复；守护、下载器或整机也离线时需等待恢复连接。",
                 "Stopping clears every torrent-level upload limit on that downloader, including manual limits, without changing global limits. Idle release defaults to15 seconds. An independent guardian recovers a stopped controller; recovery waits if the worker, downloader or host is unreachable.",
               )}
             </p>
@@ -2746,6 +2753,7 @@ export function App() {
                         timezone: c.timezone,
                         pollSeconds: c.pollSeconds,
                         idleSeconds: c.idleSeconds,
+                        uploadConfirmSeconds: c.uploadConfirmSeconds ?? 0,
                       }),
                   ],
                   [
@@ -3180,6 +3188,19 @@ export function App() {
                       )}
                     </small>
                     {field(
+                      "uploadConfirmSeconds",
+                      "持续上传确认，秒（0–300）",
+                      "Sustained upload confirmation, seconds (0–300)",
+                      "number",
+                      { min: 0, max: 300, step: 1, required: true },
+                    )}
+                    <small>
+                      {t(
+                        "0 为关闭。采样间隔为 15 秒时可从 15 秒试起。首次看到累计上传增长后开始计时，后续采样要继续增长才会参与调速。",
+                        "Set 0 to disable. With 15-second sampling, try 15 seconds. Confirmation starts at the first observed increase in cumulative upload; later samples must keep increasing.",
+                      )}
+                    </small>
+                    {field(
                       "idleSeconds",
                       "无连接释放延迟，秒（10–300）",
                       "Idle release delay, seconds (10–300)",
@@ -3188,8 +3209,8 @@ export function App() {
                     )}
                     <small>
                       {t(
-                        "推荐 15 秒：连接短暂抖动时避免反复调速；持续无连接后恢复系统施加的种子限速。",
-                        "Recommended 15 seconds avoids limit churn on brief disconnects; sustained inactivity releases system-owned limits.",
+                        "开启持续上传确认时，累计上传停止增长后开始判断闲置；关闭时，按无连接且无上传判断闲置。到期释放系统限速。",
+                        "With confirmation enabled, inactivity is based on a stalled upload counter. Otherwise, it requires no connections and no upload speed. Idle system limits are then released.",
                       )}
                     </small>
                   </>

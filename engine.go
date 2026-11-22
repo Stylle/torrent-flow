@@ -18,6 +18,8 @@ type Engine struct {
 	torrents             []Torrent
 	statuses             []ClientStatus
 	idle                 map[string]time.Time
+	uploadActivity       map[string]uploadActivity
+	uploadConfirmSeconds int
 	suspended            map[string]bool
 	adapters             map[string]*Adapter
 	started              bool
@@ -113,7 +115,17 @@ func (e *Engine) tick(ctx context.Context) {
 	all := []Torrent{}
 	statuses := []ClientStatus{}
 	warnings := []string{}
+	var nextUploadActivity map[string]uploadActivity
+	if c.UploadConfirmSeconds != e.uploadConfirmSeconds {
+		e.uploadActivity = nil
+		clear(e.idle)
+		e.uploadConfirmSeconds = c.UploadConfirmSeconds
+	}
+	if c.UploadConfirmSeconds > 0 {
+		nextUploadActivity = make(map[string]uploadActivity, len(e.uploadActivity))
+	}
 	defer func() {
+		e.uploadActivity = nextUploadActivity
 		e.stateMu.Lock()
 		e.torrents = all
 		e.statuses = statuses
@@ -152,7 +164,8 @@ func (e *Engine) tick(ctx context.Context) {
 			continue
 		}
 		status.Online = true
-		status.LastSuccess = time.Now().Unix()
+		sampledAt := time.Now()
+		status.LastSuccess = sampledAt.Unix()
 		if prior.Failures > 0 {
 			e.diagnostic("sampling", cl.ID, "Recovered")
 		}
@@ -168,6 +181,11 @@ func (e *Engine) tick(ctx context.Context) {
 			}
 		}
 		for i := range items {
+			if nextUploadActivity != nil {
+				observation := observeUpload(e.uploadActivity[items[i].Key], a, items[i], sampledAt, c)
+				nextUploadActivity[items[i].Key] = observation
+				items[i].UploadQualified = observation.qualified
+			}
 			items[i].Site, items[i].Ambiguous = siteFor(items[i], c)
 			if items[i].Site == "" {
 				for _, raw := range items[i].Trackers {
@@ -283,7 +301,11 @@ func (e *Engine) tick(ctx context.Context) {
 			if cl.Pool != pool.ID || !clientPolicyOn(cl) || t.Site == "" || e.suspended[t.Key] {
 				continue
 			}
-			if t.Connections > 0 || t.Up > 0 {
+			if c.UploadConfirmSeconds > 0 {
+				if !t.UploadQualified {
+					continue
+				}
+			} else if t.Connections > 0 || t.Up > 0 {
 				e.idle[t.Key] = now
 			} else {
 				since, ok := e.idle[t.Key]

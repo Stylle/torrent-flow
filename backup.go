@@ -225,6 +225,7 @@ func (sv *Server) backup(w http.ResponseWriter, r *http.Request) {
 	sv.e.started = false
 	sv.e.adapters = map[string]*Adapter{}
 	sv.e.idle = map[string]time.Time{}
+	sv.e.uploadActivity = nil
 	sv.e.suspended = map[string]bool{}
 	sv.e.stateMu.Lock()
 	sv.e.torrents = []Torrent{}

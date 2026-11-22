@@ -1,3 +1,8 @@
+# 0.1.13
+
+- Add an optional sustained-upload setting based on growth in cumulative uploaded bytes across consecutive samples. Connected peers with no upload traffic no longer consume an allocation when this setting is enabled.
+- Keep sustained uploads eligible across zero-speed snapshots and release system-managed limits after the configured idle delay.
+
 # 0.1.12
 
 - Add a filterable diagnostics log for downloader sampling, Tracker metadata, and SQLite writes, with recovery events and container-log fallback.

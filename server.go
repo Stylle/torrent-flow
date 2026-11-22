@@ -328,7 +328,7 @@ func (sv *Server) snapshot(w http.ResponseWriter, r *http.Request) {
 	activeSummary := map[string]int64{"count": 0, "up": 0, "managed": 0, "limit": 0}
 	for _, t := range torrents {
 		siteRates[t.Site] += t.Up
-		if t.Connections > 0 || t.Up > 0 {
+		if showInAllocation(t, c) {
 			activeSummary["count"]++
 			activeSummary["up"] += t.Up
 			if t.Managed {
@@ -399,7 +399,7 @@ func (sv *Server) snapshot(w http.ResponseWriter, r *http.Request) {
 			if view == "none" {
 				break
 			}
-			if view == "active" && t.Connections <= 0 && t.Up <= 0 {
+			if view == "active" && !showInAllocation(t, c) {
 				continue
 			}
 			if needle != "" && !strings.Contains(strings.ToLower(t.Name), needle) && !strings.Contains(strings.ToLower(strings.Join(t.Hosts, " ")), needle) {

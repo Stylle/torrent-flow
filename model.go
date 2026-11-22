@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-const Version = "0.1.12"
+const Version = "0.1.13"
 
 type Client struct {
 	RestorePending  bool   `json:"restorePending"`
@@ -65,6 +65,8 @@ type Config struct {
 	Timezone      string              `json:"timezone"`
 	PollSeconds   int                 `json:"pollSeconds"`
 	IdleSeconds   int                 `json:"idleSeconds"`
+
+	UploadConfirmSeconds int `json:"uploadConfirmSeconds"`
 }
 
 func clientPolicyOn(cl Client) bool { return cl.StrategyEnabled == nil || *cl.StrategyEnabled }
@@ -94,6 +96,8 @@ type Torrent struct {
 	Managed     bool     `json:"managed"`
 	State       string   `json:"state"`
 	Added       int64    `json:"-"`
+
+	UploadQualified bool `json:"uploadQualified,omitempty"`
 }
 type ClientStatus struct {
 	ID              string `json:"id"`
@@ -217,6 +221,9 @@ func (c Config) validate() error {
 	}
 	if c.PollSeconds < 5 || c.PollSeconds > 60 || c.IdleSeconds < 10 || c.IdleSeconds > 300 {
 		return fmt.Errorf("invalid sampling/idle interval")
+	}
+	if c.UploadConfirmSeconds < 0 || c.UploadConfirmSeconds > 300 {
+		return fmt.Errorf("持续上传确认时间必须为 0–300 秒 / Upload confirmation must be 0–300 seconds")
 	}
 	ids := map[string]bool{}
 	check := func(id string) bool {
